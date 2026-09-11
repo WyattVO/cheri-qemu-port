@@ -8,5 +8,3 @@ TARGET_XML_FILES= riscv-32bit-cpu.xml riscv-32bit-fpu.xml riscv-64bit-fpu.xml ri
 TARGET_CHERI=y
 TARGET_CHERI_RISCV_STD=y
 TARGET_CHERI_RISCV_STD_093=y
-# Capability loads/stores+tagged memory don't work with MTTCG
-TARGET_SUPPORTS_MTTCG=n

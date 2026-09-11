@@ -7,5 +7,3 @@ INCLUDE_WORKAROUND=riscv32-softmmu.mak
 TARGET_XML_FILES= riscv-32bit-cpu.xml riscv-32bit-fpu.xml riscv-64bit-fpu.xml riscv-32bit-virtual.xml riscv-32bit-cheri.xml
 TARGET_CHERI=y
 TARGET_CHERI_RISCV_V9=y
-# Capability loads/stores+tagged memory don't work with MTTCG
-TARGET_SUPPORTS_MTTCG=n
