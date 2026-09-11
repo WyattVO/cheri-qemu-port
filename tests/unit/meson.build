@@ -48,6 +48,7 @@ tests = {
   'test-qapi-util': [],
   'test-interval-tree': [],
   'test-fifo': [],
+  'test-cheri-tagmem-locktag': [],
 }
 
 if have_system or have_tools
