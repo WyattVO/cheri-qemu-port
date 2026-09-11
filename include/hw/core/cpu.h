@@ -20,6 +20,7 @@
 #ifndef QEMU_CPU_H
 #define QEMU_CPU_H
 
+#include "target/cheri-common/cheri_tagmem_ex_locks.h"
 #include "hw/qdev-core.h"
 #include "disas/dis-asm.h"
 #include "exec/breakpoint.h"
@@ -637,6 +638,9 @@ struct CPUState {
 #ifdef CONFIG_TCG_LOG_INSTR
     cpu_log_instr_state_t log_state;
 #endif
+    /* TARGET_CHERI is poison in this context. This structure is small. */
+    cheri_exception_locks_t cheri_exception_locks;
+
     /*
      * MUST BE LAST in order to minimize the displacement to CPUArchState.
      */
