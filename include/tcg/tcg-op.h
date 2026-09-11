@@ -12,6 +12,19 @@
 #include "tcg/insn-start-words.h"
 #include "exec/target_long.h"
 
+/*
+ * CHERI associates a lock with every capability sized word in order to
+ * provide tag memory. As this cost is already being paid, extra atomics
+ * are not needed for writes, although reads that do not require a tag may
+ * very well still need them.
+ */
+#ifdef TARGET_CHERI
+#define ALL_WRITES_ATOMIC 1
+#else
+#define ALL_WRITES_ATOMIC 0
+#endif
+
+
 #ifndef TARGET_LONG_BITS
 #error must include QEMU headers
 #endif
@@ -113,14 +126,19 @@ void tcg_gen_qemu_st_i128_with_checked_addr(TCGv_i128 arg,
 
 // The same as tcg_gen_qemu_st_i64_with_checked_addr but takes a boolean option
 // to clear tags or not. MIPS uses it.
+// @take_lock is false when the caller already holds the tag lock (MTTCG).
 void tcg_gen_qemu_st_i64_with_checked_addr_cond_invalidate(
     TCGv_i64 val, TCGv_cap_checked_ptr addr, TCGArg idx, MemOp memop,
-    bool invalidate);
-// tcg_gen_qemu_st_i64_with_checked_addr_cond_invalidate to manually clear a
-// tag if tag was stored but store didn't happen.
-void handle_conditional_invalidate(TCGv_cap_checked_ptr checked_addr,
-                                   MemOp memop, TCGArg mmu_idx,
-                                   TCGv_i32 store_happens);
+    bool invalidate, bool take_lock);
+/*
+ * To be used with tcg_gen_qemu_st_i64_with_checked_addr_cond_invalidate to
+ * clear tags conditionally: call start before the load/store sequence (it
+ * takes the tag lock under MTTCG) and end after it, passing start's result.
+ */
+TCGv_i32 handle_conditional_invalidate_start(TCGv_cap_checked_ptr checked_addr,
+                                             MemOp memop, TCGArg mmu_idx);
+void handle_conditional_invalidate_end(TCGv_cap_checked_ptr checked_addr,
+                                       TCGv_i32 oi, TCGv_i32 store_happens);
 
 void tcg_gen_atomic_cmpxchg_i32_with_checked_addr(TCGv_i32,
                                                   TCGv_cap_checked_ptr,
