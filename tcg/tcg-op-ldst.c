@@ -1455,11 +1455,41 @@ static void tcg_gen_qemu_st_i32_with_checked_addr_cond_invalidate(
     TCGv_i32 val, TCGv_cap_checked_ptr addr, TCGArg idx, MemOp memop,
     bool invalidate);
 
+#if defined(TARGET_RISCV) && defined(CONFIG_RVFI_DII)
+/*
+ * RVFI-DII memory tracing for TestRIG. Before the QEMU 8.x split of tcg-op.c
+ * this lived in the generic tcg_gen_qemu_{ld,st}_* emitters. A load may
+ * overwrite its own address register (e.g. ld x5, 0(x5)), so copy the
+ * address before the access.
+ */
+/* RVFI byte mask covering the bytes touched by an access of this size. */
+static inline uint64_t memop_rvfi_mask(MemOp op)
+{
+    return MAKE_64BIT_MASK(0, memop_size(op));
+}
+
+static TCGv_cap_checked_ptr rvfi_save_addr(TCGv_cap_checked_ptr addr)
+{
+    TCGv_cap_checked_ptr saved = (TCGv_cap_checked_ptr)tcg_temp_new();
+    tcg_gen_mov_tl((TCGv)saved, (TCGv)addr);
+    return saved;
+}
+#define RVFI_SAVE_ADDR(addr) rvfi_save_addr(addr)
+#else
+#define RVFI_SAVE_ADDR(addr) (addr)
+#ifndef gen_rvfi_dii_set_mem_data_i32
+#define gen_rvfi_dii_set_mem_data_i32(rw, addr, val, memop) ((void)0)
+#define gen_rvfi_dii_set_mem_data_i64(rw, addr, val, memop) ((void)0)
+#endif
+#endif
+
 void tcg_gen_qemu_ld_i32_with_checked_addr(TCGv_i32 val,
                                            TCGv_cap_checked_ptr addr,
                                            TCGArg idx, MemOp memop)
 {
+    TCGv_cap_checked_ptr trace_addr = RVFI_SAVE_ADDR(addr);
     tcg_gen_qemu_ld_i32_int(val, tcgv_tl_temp((TCGv)addr), idx, memop);
+    gen_rvfi_dii_set_mem_data_i32(r, trace_addr, val, memop);
 }
 
 void tcg_gen_qemu_st_i32_with_checked_addr(TCGv_i32 val,
@@ -1473,7 +1503,9 @@ void tcg_gen_qemu_ld_i64_with_checked_addr(TCGv_i64 val,
                                            TCGv_cap_checked_ptr addr,
                                            TCGArg idx, MemOp memop)
 {
+    TCGv_cap_checked_ptr trace_addr = RVFI_SAVE_ADDR(addr);
     tcg_gen_qemu_ld_i64_int(val, tcgv_tl_temp((TCGv)addr), idx, memop);
+    gen_rvfi_dii_set_mem_data_i64(r, trace_addr, val, memop);
 }
 
 void tcg_gen_qemu_st_i64_with_checked_addr(TCGv_i64 val,
@@ -1528,6 +1560,7 @@ static void tcg_gen_qemu_st_i32_with_checked_addr_cond_invalidate(
     bool invalidate)
 {
     tcg_gen_qemu_st_i32_int(val, tcgv_tl_temp((TCGv)addr), idx, memop);
+    gen_rvfi_dii_set_mem_data_i32(w, addr, val, memop);
     if (invalidate) {
         TCGv_i32 store_happens = tcg_temp_ebb_new_i32();
         tcg_gen_movi_i32(store_happens, 1);
@@ -1576,6 +1609,7 @@ void tcg_gen_qemu_st_i64_with_checked_addr_cond_invalidate(
         }
     } else {
         tcg_gen_qemu_st_i64_int(val, tcgv_tl_temp((TCGv)addr), idx, memop);
+        gen_rvfi_dii_set_mem_data_i64(w, addr, val, memop);
         if (invalidate) {
             TCGv_i32 store_happens = tcg_temp_ebb_new_i32();
             tcg_gen_movi_i32(store_happens, 1);
