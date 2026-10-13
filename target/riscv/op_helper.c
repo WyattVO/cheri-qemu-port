@@ -88,6 +88,14 @@ G_NORETURN void riscv_raise_exception(CPURISCVState *env,
             env->badaddr = opcode;
         }
     }
+    if (exception == RISCV_EXCP_ILLEGAL_INST) {
+        /*
+         * Since QEMU 8.x riscv_cpu_do_interrupt() reports env->bins as the
+         * illegal-instruction tval; helpers raising it at runtime (rather
+         * than via decode_save_opc()) only filled badaddr, giving tval 0.
+         */
+        env->bins = env->badaddr;
+    }
     cpu_loop_exit(cs);
 }
 
