@@ -21,6 +21,7 @@
 #include "qemu/log.h"
 #include "qemu/main-loop.h"
 #include "cpu.h"
+#include "system/cpus.h"
 #include "internals.h"
 #include "pmu.h"
 #include "exec/cputlb.h"
@@ -1347,7 +1348,7 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
          * env->rvfi_dii_injected_insn.
          */
         *physical = addr;
-        *prot = PAGE_EXEC;
+        *ret_prot = PAGE_EXEC;
         return TRANSLATE_SUCCESS;
     }
 #endif
@@ -3001,6 +3002,13 @@ void riscv_cpu_do_interrupt(CPUState *cs)
              */
             if ((cause == RISCV_EXCP_INST_ACCESS_FAULT ||
                  cause == RISCV_EXCP_ILLEGAL_INST) &&
+#ifdef CONFIG_RVFI_DII
+                /*
+                 * Under RVFI-DII the next instruction is injected, not
+                 * fetched from the handler, so this is not a loop.
+                 */
+                !rvfi_client_fd &&
+#endif
 #ifdef TARGET_CHERI
                 cap_exactly_equal(&env->pcc, &env->mtvecc)) {
 #else

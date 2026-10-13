@@ -44,6 +44,11 @@
 #include "monitor/monitor.h"
 
 #include "rvfi_dii.h"
+#ifdef CONFIG_RVFI_DII
+#include "exec/cputlb.h"
+#include "exec/tb-flush.h"
+#include "exec/translation-block.h"
+#endif
 #include "helper_utils.h"
 
 #ifdef TARGET_CHERI
@@ -753,7 +758,6 @@ bool riscv_cpu_has_work(CPUState *cs)
 #endif /* !CONFIG_USER_ONLY */
 
 #ifdef CONFIG_RVFI_DII
-extern int rvfi_client_fd;
 extern bool rvfi_debug_output;
 
 static void send_rvfi_dii_packet(const void *data, size_t len)
@@ -916,7 +920,31 @@ void rvfi_dii_communicate(CPUState* cs, CPURISCVState* env, bool was_trap) {
             env->rvfi_dii_trace.INST.rvfi_order = 0;
             // Clear all fields that can be zeroes: we want a defined reset
             // state for TestRIG even if the RISC-V ISA does not guarantee it.
-            memset(env, 0, offsetof(CPURISCVState, end_testrig_reset_fields));
+            {
+                /*
+                 * The cleared range also holds state that cpu_reset() does
+                 * not recreate: host-side objects (debug trigger timers and
+                 * breakpoints since QEMU 8.x, machine callbacks) and the CPU
+                 * configuration chosen at realize time (MISA extensions,
+                 * privileged/vector spec versions). Zeroing the former makes
+                 * cpu_reset() dereference NULL; zeroing the latter silently
+                 * disables extensions such as C. Carry both over the reset.
+                 */
+                CPURISCVState saved;
+#define RVFI_KEEP(f) memcpy(&saved.f, &env->f, sizeof(env->f))
+#define RVFI_RESTORE(f) memcpy(&env->f, &saved.f, sizeof(env->f))
+#define RVFI_HOST_FIELDS(X) X(cpu_breakpoint); X(cpu_watchpoint); \
+    X(itrigger_timer); X(rdtime_fn); X(rdtime_fn_arg);            \
+    X(aia_ireg_rmw_fn); X(aia_ireg_rmw_fn_arg);                   \
+    X(misa_mxl); X(misa_ext); X(misa_ext_mask);                   \
+    X(priv_ver); X(vext_ver)
+                RVFI_HOST_FIELDS(RVFI_KEEP);
+                memset(env, 0, offsetof(CPURISCVState, end_testrig_reset_fields));
+                RVFI_HOST_FIELDS(RVFI_RESTORE);
+#undef RVFI_HOST_FIELDS
+#undef RVFI_RESTORE
+#undef RVFI_KEEP
+            }
             // Overwrite the processor's resetvec as otherwise reset()
             // writes PC with default RSTVECTOR (0x10000)
             env->resetvec = RVFI_DII_RAM_START;
@@ -924,7 +952,12 @@ void rvfi_dii_communicate(CPUState* cs, CPURISCVState* env, bool was_trap) {
             cpu_reset(cs);
             // FIXME: Hopefully this resets RAM?
             qemu_system_reset(SHUTDOWN_CAUSE_HOST_SIGNAL);
-            cs->cflags_next_tb = (curr_cflags(cs) & ~CF_USE_ICOUNT) | 1;
+            /*
+             * curr_cflags() is private to accel/tcg since QEMU 8.x; RVFI-DII
+             * always runs one instruction per TB, so build the same flags.
+             */
+            cs->cflags_next_tb = (cs->tcg_cflags & ~CF_USE_ICOUNT) |
+                                 CF_NO_GOTO_TB | 1;
             hwaddr system_ram_addr = cpu_get_phys_page_debug(cs, PC_ADDR(env));
             hwaddr system_ram_size = RVFI_DII_RAM_SIZE;
             void *ram_ptr = cpu_physical_memory_map(
@@ -937,8 +970,8 @@ void rvfi_dii_communicate(CPUState* cs, CPURISCVState* env, bool was_trap) {
             memset(ram_ptr, 0, system_ram_size);
             // Unmap: this should invalidate all caches for that regio.
             cpu_physical_memory_unmap(ram_ptr, system_ram_size, /*is_write=*/true, system_ram_size);
-            // Flush the TCG state:
-            tb_flush(cs);
+            // Flush the TCG state (RVFI-DII runs a single vCPU, i.e. serial):
+            tb_flush__exclusive_or_serial();
             tlb_flush(cs); // Flush the QEMU guest->host tlb
 
             // TestRIG expects all capability registers to be max perms
@@ -999,7 +1032,7 @@ void rvfi_dii_communicate(CPUState* cs, CPURISCVState* env, bool was_trap) {
             // blocks in RVFI-DII mode, but I can't figure out how to do this.
             // Instead let's just flush the entire TCG cache (which should have
             // the same effect).
-            tb_flush(cs); // flush TCG state
+            tb_flush__exclusive_or_serial(); // flush TCG state
             env->rvfi_dii_injected_insn = cmd_buf.rvfi_dii_insn;
             env->rvfi_dii_have_injected_insn = true;
             env->rvfi_dii_trace.PC.rvfi_pc_rdata = GET_SPECIAL_REG_ARCH(env, pc, pcc);
@@ -1010,7 +1043,12 @@ void rvfi_dii_communicate(CPUState* cs, CPURISCVState* env, bool was_trap) {
             env->rvfi_dii_trace.PC.rvfi_pc_wdata = -1; // Will be set after single-step trap
             // Clear the EXCP_DEBUG flag to avoid dropping into GDB
             cs->exception_index = RISCV_EXCP_NONE;
-            cs->cflags_next_tb = (curr_cflags(cs) & ~CF_USE_ICOUNT) | 1;
+            /*
+             * curr_cflags() is private to accel/tcg since QEMU 8.x; RVFI-DII
+             * always runs one instruction per TB, so build the same flags.
+             */
+            cs->cflags_next_tb = (cs->tcg_cflags & ~CF_USE_ICOUNT) |
+                                 CF_NO_GOTO_TB | 1;
             // Continue execution at env->pc
             cpu_loop_exit_noexc(cs); // noreturn -> jumps back to TCG
         }
@@ -1025,21 +1063,6 @@ void rvfi_dii_communicate(CPUState* cs, CPURISCVState* env, bool was_trap) {
 
 #endif // CONFIG_RVFI_DII
 
-static void riscv_debug_excp_handler(CPUState *cs)
-{
-    /*
-     * Called by core code when a watchpoint or breakpoint fires;
-     * Also happens for singlestep events
-     */
-#ifdef CONFIG_RVFI_DII
-    ArchCPU *cpu = RISCV_CPU(cs);
-    CPUArchState *env = &cpu->env;
-    if (rvfi_client_fd && cs->singlestep_enabled) {
-        rvfi_dii_communicate(cs, env, false);
-        return;
-    }
-#endif
-}
 static void riscv_cpu_reset_hold(Object *obj, ResetType type)
 {
 #ifndef CONFIG_USER_ONLY
@@ -1352,6 +1375,9 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
     CPUState *cs = CPU(dev);
     RISCVCPU *cpu = RISCV_CPU(dev);
     RISCVCPUClass *mcc = RISCV_CPU_GET_CLASS(dev);
+#if defined(CONFIG_DEBUG_TCG) || defined(CONFIG_RVFI_DII)
+    CPURISCVState *env = &cpu->env;
+#endif
     Error *local_err = NULL;
 
     cpu_exec_realizefn(cs, &local_err);

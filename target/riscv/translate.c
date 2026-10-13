@@ -508,7 +508,8 @@ static void _gen_set_gpr(DisasContext *ctx, int reg_num, TCGv t,
         }
 #endif
         gen_rvfi_dii_set_field_const_i8(INTEGER, rd_addr, reg_num);
-        gen_rvfi_dii_set_field_zext_tl(INTEGER, rd_wdata, t);
+        /* Report the value as written, i.e. after any RV32 sign extension. */
+        gen_rvfi_dii_set_field_zext_tl(INTEGER, rd_wdata, dest_gpr[reg_num]);
 #ifdef CONFIG_TCG_LOG_INSTR
         // Log GPR writes here
         if (qemu_ctx_logging_enabled(ctx)) {
@@ -545,6 +546,9 @@ static void gen_set_gpri(DisasContext *ctx, int reg_num, target_long imm)
             tcg_gen_movi_tl(cpu_gprh[reg_num], -(imm < 0));
         }
 #endif
+        /* RVFI-DII: report immediate writes too (e.g. lui, li). */
+        gen_rvfi_dii_set_field_const_i8(INTEGER, rd_addr, reg_num);
+        gen_rvfi_dii_set_field_zext_tl(INTEGER, rd_wdata, dest_gpr[reg_num]);
     }
 }
 
@@ -1707,6 +1711,17 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx)
     bool pc_is_4byte_align = ((ctx->base.pc_next % 4) == 0);
 
     ctx->virt_inst_excp = false;
+#ifdef CONFIG_RVFI_DII
+    if (env->rvfi_dii_have_injected_insn) {
+        /*
+         * TestRIG injects the instruction directly; avoid memory accesses
+         * since the PC could point somewhere invalid. For an unaligned PC
+         * only the low half is taken here, the high half is added below.
+         */
+        opcode = pc_is_4byte_align ? env->rvfi_dii_injected_insn
+                                   : (uint16_t)env->rvfi_dii_injected_insn;
+    } else
+#endif
     if (pc_is_4byte_align) {
         /*
          * Load 4 bytes at once to make instruction fetch atomically.
@@ -1880,6 +1895,15 @@ static void riscv_tr_translate_insn(DisasContextBase *dcbase, CPUState *cpu)
 
     /* Only the first insn within a TB is allowed to cross a page boundary. */
     if (ctx->base.is_jmp == DISAS_NEXT) {
+#ifdef CONFIG_RVFI_DII
+        /*
+         * TestRIG injects one instruction per TB; never peek at the next
+         * instruction in guest memory, which may not be mapped.
+         */
+        if (env->rvfi_dii_have_injected_insn) {
+            ctx->base.is_jmp = DISAS_TOO_MANY;
+        } else
+#endif
         if (ctx->itrigger || !translator_is_same_page(&ctx->base, ctx->base.pc_next)) {
             ctx->base.is_jmp = DISAS_TOO_MANY;
         } else {

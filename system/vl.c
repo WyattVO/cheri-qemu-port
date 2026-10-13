@@ -3685,11 +3685,9 @@ void qemu_init(int argc, char **argv)
                     error_report("Invalid RVFI-DII port '%s'", optarg);
                     exit(EXIT_FAILURE);
                 }
-                // Set -M virt and -m 8 Mib
-                opts = qemu_opts_parse_noisily(qemu_find_opts("machine"), "virt", true);
-                if (!opts) {
-                    exit(EXIT_FAILURE);
-                }
+                // Set -M virt and -m 8 Mib (-machine options live in a QDict
+                // since QEMU 6.x; the "machine" QemuOpts group no longer exists)
+                qdict_put_str(machine_opts_dict, "type", "virt");
                 opts = qemu_opts_parse_noisily(qemu_find_opts("memory"), "8M", true);
                 if (!opts) {
                     exit(EXIT_FAILURE);

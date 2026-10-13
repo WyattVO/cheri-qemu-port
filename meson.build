@@ -3388,9 +3388,8 @@ foreach target : target_dirs
   if get_option('tcg_log_instr')
     config_target += {'CONFIG_TCG_LOG_INSTR': 'y'}
   endif
-  if get_option('rvfi_dii')
-    config_target += {'CONFIG_RVFI_DII': 'y'}
-  endif
+  # CONFIG_RVFI_DII is a host-wide option (config_host_data): system/vl.c is
+  # target-independent, so a per-target copy would be poisoned there.
   if 'TARGET_NEED_FDT' in config_target and not fdt.found()
     if default_targets
       warning('Disabling ' + target + ' due to missing libfdt')

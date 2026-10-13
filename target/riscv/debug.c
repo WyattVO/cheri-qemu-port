@@ -32,6 +32,7 @@
 #include "exec/watchpoint.h"
 #include "system/cpu-timers.h"
 #include "exec/icount.h"
+#include "system/cpus.h"
 
 /*
  * The following M-mode trigger CSRs are implemented:
@@ -926,6 +927,14 @@ void riscv_cpu_debug_excp_handler(CPUState *cs)
 {
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
+
+#ifdef CONFIG_RVFI_DII
+    /* Single-step stops drive the RVFI-DII instruction exchange. */
+    if (rvfi_client_fd && cs->singlestep_enabled) {
+        rvfi_dii_communicate(cs, env, false);
+        return;
+    }
+#endif
 
     if (cs->watchpoint_hit) {
         if (cs->watchpoint_hit->flags & BP_CPU) {
