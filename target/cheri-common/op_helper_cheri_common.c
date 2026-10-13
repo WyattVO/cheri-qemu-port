@@ -1844,6 +1844,13 @@ void CHERI_HELPER_IMPL(decompress_cap(CPUArchState *env, uint32_t regndx))
     get_readonly_capreg(env, regndx);
 }
 
+#if defined(TARGET_RISCV) && defined(CONFIG_RVFI_DII)
+void CHERI_HELPER_IMPL(rvfi_changed_capreg(CPUArchState *env, uint32_t regnum))
+{
+    rvfi_changed_capreg(env, regnum, cap_get_cursor(get_readonly_capreg(env, regnum)));
+}
+#endif
+
 void CHERI_HELPER_IMPL(debug_cap(CPUArchState *env, uint32_t regndx))
 {
     GPCapRegs *gpcrs = cheri_get_gpcrs(env);
