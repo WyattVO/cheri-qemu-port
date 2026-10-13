@@ -224,7 +224,8 @@ static uint32_t csr_for_cspecialrw(enum CheriSCR scr)
     case CheriSCR_MTIDC:
         return CSR_MTIDC;
     }
-    assert(false);
+    /* Reserved SCR index: the caller raises an illegal instruction. */
+    return 0;
 }
 
 void HELPER(cspecialrw)(CPUArchState *env, uint32_t cd, uint32_t cs,
@@ -236,8 +237,14 @@ void HELPER(cspecialrw)(CPUArchState *env, uint32_t cd, uint32_t cs,
 
     assert(index <= 31 && "Bug in translator?");
     uint32_t csrno = csr_for_cspecialrw(index);
-    riscv_csr_cap_ops *ops = get_csr_cap_info(csrno);
-    assert(ops != NULL);
+    riscv_csr_cap_ops *ops = csrno ? get_csr_cap_info(csrno) : NULL;
+    if (ops == NULL) {
+        /*
+         * Reserved or unimplemented SCR (guest-controlled encoding): this is
+         * an illegal instruction, not a QEMU bug, so never assert here.
+         */
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, _host_return_address);
+    }
     bool is_write = cs != 0;
     bool is_read = cd != 0;
     check_csr_cap_permissions(env, csrno, is_write, ops, GETPC());
