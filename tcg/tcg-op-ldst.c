@@ -1741,13 +1741,49 @@ void tcg_gen_nonatomic_cmpxchg_i64_with_checked_addr(TCGv_i64 retv,
     cheri_cmpxchg_i64(retv, checked_addr, cmpv, newv, idx, memop);
 }
 
+/* As cheri_cmpxchg_i64, for amocas.q. */
+static void cheri_cmpxchg_i128(TCGv_i128 retv, TCGv_cap_checked_ptr addr,
+                               TCGv_i128 cmpv, TCGv_i128 newv, TCGArg idx,
+                               MemOp memop)
+{
+    TCGTemp *addr_temp = tcgv_tl_temp((TCGv)addr);
+    TCGv_i128 oldv = tcg_temp_ebb_new_i128();
+    TCGv_i128 tmpv = tcg_temp_ebb_new_i128();
+    TCGv_i64 t0 = tcg_temp_ebb_new_i64();
+    TCGv_i64 t1 = tcg_temp_ebb_new_i64();
+    TCGv_i32 equal = tcg_temp_ebb_new_i32();
+    TCGv_i64 z = tcg_constant_i64(0);
+
+    tcg_debug_assert((memop & (MO_SIZE | MO_SIGN)) == MO_128);
+    tcg_gen_qemu_ld_i128_int(oldv, addr_temp, idx, memop);
+
+    tcg_gen_xor_i64(t0, TCGV128_LOW(oldv), TCGV128_LOW(cmpv));
+    tcg_gen_xor_i64(t1, TCGV128_HIGH(oldv), TCGV128_HIGH(cmpv));
+    tcg_gen_or_i64(t0, t0, t1);
+    tcg_gen_setcond_i64(TCG_COND_EQ, t1, t0, z);
+    tcg_gen_extrl_i64_i32(equal, t1);
+    handle_conditional_invalidate(addr, memop, idx, equal);
+    tcg_temp_free_i32(equal);
+
+    tcg_gen_movcond_i64(TCG_COND_EQ, TCGV128_LOW(tmpv), t0, z,
+                        TCGV128_LOW(newv), TCGV128_LOW(oldv));
+    tcg_gen_movcond_i64(TCG_COND_EQ, TCGV128_HIGH(tmpv), t0, z,
+                        TCGV128_HIGH(newv), TCGV128_HIGH(oldv));
+    tcg_gen_qemu_st_i128_int(tmpv, addr_temp, idx, memop);
+    tcg_gen_mov_i128(retv, oldv);
+
+    tcg_temp_free_i64(t0);
+    tcg_temp_free_i64(t1);
+    tcg_temp_free_i128(tmpv);
+    tcg_temp_free_i128(oldv);
+}
+
 void tcg_gen_nonatomic_cmpxchg_i128_with_checked_addr(TCGv_i128 retv,
                                                       TCGv_cap_checked_ptr checked_addr,
                                                       TCGv_i128 cmpv, TCGv_i128 newv,
                                                       TCGArg idx, MemOp memop)
 {
-    tcg_gen_nonatomic_cmpxchg_i128_chk(retv, tcgv_tl_temp((TCGv)checked_addr),
-                                       cmpv, newv, idx, memop, TCG_TYPE_TL);
+    cheri_cmpxchg_i128(retv, checked_addr, cmpv, newv, idx, memop);
 }
 
 void tcg_gen_atomic_cmpxchg_i128_with_checked_addr(TCGv_i128 retv,
@@ -1755,7 +1791,6 @@ void tcg_gen_atomic_cmpxchg_i128_with_checked_addr(TCGv_i128 retv,
                                                    TCGv_i128 cmpv, TCGv_i128 newv,
                                                    TCGArg idx, MemOp memop)
 {
-    tcg_gen_atomic_cmpxchg_i128_chk(retv, tcgv_tl_temp((TCGv)checked_addr),
-                                    cmpv, newv, idx, memop, TCG_TYPE_TL);
+    cheri_cmpxchg_i128(retv, checked_addr, cmpv, newv, idx, memop);
 }
 #endif
