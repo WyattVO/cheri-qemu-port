@@ -34,6 +34,7 @@
 #include "qemu/timer.h"
 #include "hw/irq.h"
 #include "migration/vmstate.h"
+#include "system/cpus.h"
 
 typedef struct riscv_aclint_mtimer_callback {
     RISCVAclintMTimerState *s;
@@ -324,6 +325,26 @@ static void riscv_aclint_mtimer_reset_enter(Object *obj, ResetType type)
      * Pending mtime interrupts will also be cleared at the same time.
      */
     riscv_aclint_mtimer_write(mtimer, mtimer->time_base, 0, 8);
+
+#ifdef CONFIG_RVFI_DII
+    /*
+     * TestRIG resets the machine before every test and compares against
+     * models without a timer, so keep timer interrupts from going pending:
+     * otherwise mip.MTIP is set as soon as mtime reaches the stale or zero
+     * MTIMECMP.
+     */
+    if (rvfi_client_fd > 0) {
+        for (int i = 0; i < mtimer->num_harts; i++) {
+            CPUState *cs = cpu_by_arch_id(mtimer->hartid_base + i);
+
+            if (cs) {
+                riscv_aclint_mtimer_write_timecmp(mtimer, RISCV_CPU(cs),
+                                                  mtimer->hartid_base + i,
+                                                  UINT64_MAX);
+            }
+        }
+    }
+#endif
 }
 
 static const VMStateDescription vmstate_riscv_mtimer = {
