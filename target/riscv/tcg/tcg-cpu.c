@@ -1241,18 +1241,34 @@ static void riscv_cpu_cheri_disable_unsafe_exts(RISCVCPU *cpu, Error **errp)
      * Don't check cfg.ext_cheri: bare and profile CPUs don't set it until
      * reset, which always turns it on.
      */
-    if (riscv_has_ext(env, RVV)) {
+    static const struct {
+        uint32_t bit;
+        const char *name;
+        const char *reason;
+    } unsafe_misa[] = {
+        { RVV, "v",
+          "vector loads/stores bypass capability bounds and permission checks" },
+        { RVH, "h",
+          "the hypervisor extension is not defined for CHERI (and hlvx "
+          "aborts QEMU)" },
+    };
+
+    for (size_t i = 0; i < ARRAY_SIZE(unsafe_misa); i++) {
+        uint32_t bit = unsafe_misa[i].bit;
+
+        if (!riscv_has_ext(env, bit)) {
+            continue;
+        }
         if (GPOINTER_TO_UINT(g_hash_table_lookup(misa_ext_user_opts,
-                                                 GUINT_TO_POINTER(RVV)))) {
-            error_setg(errp, "Extension v is not supported on CHERI CPUs: "
-                       "vector loads/stores bypass capability bounds and "
-                       "permission checks");
+                                                 GUINT_TO_POINTER(bit)))) {
+            error_setg(errp, "Extension %s is not supported on CHERI CPUs: %s",
+                       unsafe_misa[i].name, unsafe_misa[i].reason);
             return;
         }
-        warn_report("Disabling extension v on CHERI CPU: vector loads/stores "
-                    "bypass capability bounds and permission checks");
-        riscv_cpu_set_misa_ext(env, env->misa_ext & ~RVV);
-        env->misa_ext_mask &= ~RVV;
+        warn_report("Disabling extension %s on CHERI CPU: %s",
+                    unsafe_misa[i].name, unsafe_misa[i].reason);
+        riscv_cpu_set_misa_ext(env, env->misa_ext & ~bit);
+        env->misa_ext_mask &= ~bit;
     }
     for (size_t i = 0; i < ARRAY_SIZE(cheri_unsafe_exts); i++) {
         uint32_t offset = cheri_unsafe_exts[i].offset;
