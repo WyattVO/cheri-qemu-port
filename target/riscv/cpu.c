@@ -3656,7 +3656,6 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .cfg.ext_zca = true,
         .cfg.ext_zcb = true,
         .cfg.ext_zcd = true,
-        .cfg.ext_zcf = true,
         .cfg.ext_zbkb = true,
         .cfg.ext_zihintpause = true,
     ),
