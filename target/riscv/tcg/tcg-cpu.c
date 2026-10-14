@@ -1215,6 +1215,10 @@ static const struct {
                      "jump table reads are not checked against PCC or DDC"),
     CHERI_UNSAFE_EXT(smrnmi,
                      "mnret changes privilege without restoring PCC"),
+    CHERI_UNSAFE_EXT(zicfiss,
+                     "shadow stack accesses are not checked against DDC"),
+    CHERI_UNSAFE_EXT(zicfilp,
+                     "capability jumps don't set the expected landing pad state"),
 #undef CHERI_UNSAFE_EXT
 };
 
