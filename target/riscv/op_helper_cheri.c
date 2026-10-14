@@ -264,6 +264,28 @@ void HELPER(cspecialrw)(CPUArchState *env, uint32_t cd, uint32_t cs,
         ops->write(env, ops, new_val, cap_get_cursor(&new_val), /*clen=*/true);
     }
 }
+
+/*
+ * CClear: set capability register 8*q+i to NULL for each set bit i of mask,
+ * except that bit 0 of quarter 0 refers to DDC rather than C0.
+ */
+void HELPER(cclear)(CPUArchState *env, uint32_t q, uint32_t mask)
+{
+    cap_register_t null_cap = make_null_capability(env);
+
+    for (uint32_t i = 0; i < 8; i++) {
+        if (!(mask & (1u << i))) {
+            continue;
+        }
+        if (q == 0 && i == 0) {
+            env->ddc = null_cap;
+            cheri_log_instr_changed_capreg(env, "ddc", &env->ddc, CSR_DDC,
+                                           LRI_CSR_ACCESS);
+        } else {
+            update_capreg(env, 8 * q + i, &null_cap);
+        }
+    }
+}
 #endif /* TARGET_CHERI_RISCV_V9 */
 
 #ifdef DO_CHERI_STATISTICS

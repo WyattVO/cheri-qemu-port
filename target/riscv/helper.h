@@ -81,6 +81,7 @@ DEF_HELPER_FLAGS_2(froundnx_d, TCG_CALL_NO_RWG_SE, i64, env, i64)
 #include "cheri-helper-common.h"
 #ifdef TARGET_CHERI_RISCV_V9
 DEF_HELPER_4(cspecialrw, void, env, i32, i32, i32)
+DEF_HELPER_3(cclear, void, env, i32, i32)
 #endif
 DEF_HELPER_3(auipcc, void, env, i32, tl)
 DEF_HELPER_4(cjal, void, env, i32, tl, tl)

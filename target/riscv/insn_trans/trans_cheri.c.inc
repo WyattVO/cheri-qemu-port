@@ -246,6 +246,22 @@ static bool trans_cspecialrw(DisasContext *ctx, arg_cspecialrw *a)
     return false;
 }
 
+// CClear q, m: clear capability registers 8*q+i for each set bit i of m
+static bool trans_cclear(DisasContext *ctx, arg_cclear *a)
+{
+    uint32_t q = a->rs1 >> 3;
+    uint32_t mask = ((a->rs1 & 7) << 5) | a->rd;
+
+    gen_helper_cclear(tcg_env, tcg_constant_i32(q), tcg_constant_i32(mask));
+    if (q == 0 && (mask & 1)) {
+        // Bit 0 of quarter 0 is DDC: exit the TB since DDC is cached in flags.
+        gen_set_pc_imm(ctx, ctx->pc_succ_insn);
+        tcg_gen_exit_tb(NULL, 0);
+        ctx->base.is_jmp = DISAS_NORETURN;
+    }
+    return true;
+}
+
 // Three operand (cap cap int)
 TRANSLATE_CAP_CAP_INT(candperm)
 TRANSLATE_CAP_CAP_INT(cfromptr)
