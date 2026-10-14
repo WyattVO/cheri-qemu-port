@@ -6189,6 +6189,25 @@ RISCVException riscv_csrrw_check(CPURISCVState *env,
     return RISCV_EXCP_NONE;
 }
 
+/*
+ * riscv_csrrw_check() for the CSR access entry points: a missing
+ * Access_System_Registers permission must be raised as a CHERI exception with
+ * its cause and register recorded, not returned as a bare RISCV_EXCP_CHERI
+ * that the caller then raises without that information.
+ */
+static RISCVException riscv_csrrw_check_raise(CPURISCVState *env, int csrno,
+                                              bool write, uintptr_t retpc)
+{
+    RISCVException ret = riscv_csrrw_check(env, csrno, write);
+#ifdef TARGET_CHERI
+    if (ret == RISCV_EXCP_CHERI) {
+        raise_cheri_exception_impl(env, CapEx_AccessSystemRegsViolation,
+                                   CHERI_EXC_REGNUM_PCC, 0, true, retpc);
+    }
+#endif
+    return ret;
+}
+
 static RISCVException riscv_csrrw_do64(CPURISCVState *env, int csrno,
                                        target_ulong *ret_value,
                                        target_ulong new_value,
@@ -6261,7 +6280,7 @@ static RISCVException riscv_csrrw_do64(CPURISCVState *env, int csrno,
 RISCVException riscv_csrr(CPURISCVState *env, int csrno,
                            target_ulong *ret_value, uintptr_t retpc)
 {
-    RISCVException ret = riscv_csrrw_check(env, csrno, false);
+    RISCVException ret = riscv_csrrw_check_raise(env, csrno, false, retpc);
     if (ret != RISCV_EXCP_NONE) {
         return ret;
     }
@@ -6274,7 +6293,7 @@ RISCVException riscv_csrrw(CPURISCVState *env, int csrno,
                            target_ulong new_value, target_ulong write_mask,
                            uintptr_t retpc)
 {
-    RISCVException ret = riscv_csrrw_check(env, csrno, true);
+    RISCVException ret = riscv_csrrw_check_raise(env, csrno, true, retpc);
     if (ret != RISCV_EXCP_NONE) {
         return ret;
     }
@@ -6325,7 +6344,7 @@ static RISCVException riscv_csrrw_do128(CPURISCVState *env, int csrno,
 RISCVException riscv_csrr_i128(CPURISCVState *env, int csrno,
                                Int128 *ret_value, uintptr_t retpc)
 {
-    RISCVException ret = riscv_csrrw_check(env, csrno, false);
+    RISCVException ret = riscv_csrrw_check_raise(env, csrno, false, retpc);
     if (ret != RISCV_EXCP_NONE) {
         return ret;
     }
@@ -6357,7 +6376,7 @@ RISCVException riscv_csrrw_i128(CPURISCVState *env, int csrno,
 {
     RISCVException ret;
 
-    ret = riscv_csrrw_check(env, csrno, true);
+    ret = riscv_csrrw_check_raise(env, csrno, true, retpc);
     if (ret != RISCV_EXCP_NONE) {
         return ret;
     }
