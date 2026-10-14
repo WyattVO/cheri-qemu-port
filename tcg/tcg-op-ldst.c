@@ -1630,6 +1630,71 @@ void handle_conditional_invalidate(TCGv_cap_checked_ptr checked_addr,
 }
 
 /*
+ * CHERI compare-and-swap: a successful exchange is a store, so it must clear
+ * the capability tags it overwrites and be reported to RVFI like any other
+ * load and store. The generic cmpxchg expansions use the untraced _int
+ * accessors and never touch tags, which let LR/SC rewrite part of a stored
+ * capability while keeping it tagged. CHERI targets do not support MTTCG, so
+ * this serial expansion is the one that runs (as in the QEMU 7.x CHERI port).
+ */
+static void cheri_cmpxchg_i32(TCGv_i32 retv, TCGv_cap_checked_ptr addr,
+                              TCGv_i32 cmpv, TCGv_i32 newv, TCGArg idx,
+                              MemOp memop)
+{
+    TCGv_i32 t1 = tcg_temp_ebb_new_i32();
+    TCGv_i32 t2 = tcg_temp_ebb_new_i32();
+    TCGv_i32 equal = tcg_temp_ebb_new_i32();
+
+    memop = tcg_canonicalize_memop(memop, 0, 0);
+    tcg_gen_ext_i32(t2, cmpv, memop & MO_SIZE);
+    tcg_gen_qemu_ld_i32_with_checked_addr(t1, addr, idx, memop & ~MO_SIGN);
+    tcg_gen_setcond_i32(TCG_COND_EQ, equal, t1, t2);
+    handle_conditional_invalidate(addr, memop, idx, equal);
+    tcg_temp_free_i32(equal);
+    tcg_gen_movcond_i32(TCG_COND_EQ, t2, t1, t2, newv, t1);
+    tcg_gen_qemu_st_i32_with_checked_addr_cond_invalidate(t2, addr, idx,
+                                                          memop, false);
+    tcg_temp_free_i32(t2);
+
+    if (memop & MO_SIGN) {
+        tcg_gen_ext_i32(retv, t1, memop);
+    } else {
+        tcg_gen_mov_i32(retv, t1);
+    }
+    tcg_temp_free_i32(t1);
+}
+
+static void cheri_cmpxchg_i64(TCGv_i64 retv, TCGv_cap_checked_ptr addr,
+                              TCGv_i64 cmpv, TCGv_i64 newv, TCGArg idx,
+                              MemOp memop)
+{
+    TCGv_i64 t1 = tcg_temp_ebb_new_i64();
+    TCGv_i64 t2 = tcg_temp_ebb_new_i64();
+    TCGv_i64 equal64 = tcg_temp_ebb_new_i64();
+    TCGv_i32 equal = tcg_temp_ebb_new_i32();
+
+    memop = tcg_canonicalize_memop(memop, 1, 0);
+    tcg_gen_ext_i64(t2, cmpv, memop & MO_SIZE);
+    tcg_gen_qemu_ld_i64_with_checked_addr(t1, addr, idx, memop & ~MO_SIGN);
+    tcg_gen_setcond_i64(TCG_COND_EQ, equal64, t1, t2);
+    tcg_gen_extrl_i64_i32(equal, equal64);
+    tcg_temp_free_i64(equal64);
+    handle_conditional_invalidate(addr, memop, idx, equal);
+    tcg_temp_free_i32(equal);
+    tcg_gen_movcond_i64(TCG_COND_EQ, t2, t1, t2, newv, t1);
+    tcg_gen_qemu_st_i64_with_checked_addr_cond_invalidate(t2, addr, idx,
+                                                          memop, false);
+    tcg_temp_free_i64(t2);
+
+    if (memop & MO_SIGN) {
+        tcg_gen_ext_i64(retv, t1, memop);
+    } else {
+        tcg_gen_mov_i64(retv, t1);
+    }
+    tcg_temp_free_i64(t1);
+}
+
+/*
  * Atomics with checked address.
  * Since they are poisoned for CHERI, we must implement the _with_checked_addr
  * versions by calling the internal _chk versions.
@@ -1639,6 +1704,10 @@ void tcg_gen_atomic_cmpxchg_i32_with_checked_addr(TCGv_i32 r,
                                                   TCGv_i32 c, TCGv_i32 n,
                                                   TCGArg i, MemOp m)
 {
+    if (!(tcg_ctx->gen_tb->cflags & CF_PARALLEL)) {
+        cheri_cmpxchg_i32(r, a, c, n, i, m);
+        return;
+    }
     tcg_gen_atomic_cmpxchg_i32_chk(r, tcgv_tl_temp((TCGv)a), c, n, i, m,
                                    TCG_TYPE_TL);
 }
@@ -1648,6 +1717,10 @@ void tcg_gen_atomic_cmpxchg_i64_with_checked_addr(TCGv_i64 r,
                                                   TCGv_i64 c, TCGv_i64 n,
                                                   TCGArg i, MemOp m)
 {
+    if (!(tcg_ctx->gen_tb->cflags & CF_PARALLEL)) {
+        cheri_cmpxchg_i64(r, a, c, n, i, m);
+        return;
+    }
     tcg_gen_atomic_cmpxchg_i64_chk(r, tcgv_tl_temp((TCGv)a), c, n, i, m,
                                    TCG_TYPE_TL);
 }
@@ -1657,8 +1730,7 @@ void tcg_gen_nonatomic_cmpxchg_i32_with_checked_addr(TCGv_i32 retv,
                                                      TCGv_i32 cmpv, TCGv_i32 newv,
                                                      TCGArg idx, MemOp memop)
 {
-    tcg_gen_nonatomic_cmpxchg_i32_chk(retv, tcgv_tl_temp((TCGv)checked_addr),
-                                      cmpv, newv, idx, memop, TCG_TYPE_TL);
+    cheri_cmpxchg_i32(retv, checked_addr, cmpv, newv, idx, memop);
 }
 
 void tcg_gen_nonatomic_cmpxchg_i64_with_checked_addr(TCGv_i64 retv,
@@ -1666,8 +1738,7 @@ void tcg_gen_nonatomic_cmpxchg_i64_with_checked_addr(TCGv_i64 retv,
                                                      TCGv_i64 cmpv, TCGv_i64 newv,
                                                      TCGArg idx, MemOp memop)
 {
-    tcg_gen_nonatomic_cmpxchg_i64_chk(retv, tcgv_tl_temp((TCGv)checked_addr),
-                                      cmpv, newv, idx, memop, TCG_TYPE_TL);
+    cheri_cmpxchg_i64(retv, checked_addr, cmpv, newv, idx, memop);
 }
 
 void tcg_gen_nonatomic_cmpxchg_i128_with_checked_addr(TCGv_i128 retv,
