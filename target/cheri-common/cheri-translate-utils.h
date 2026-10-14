@@ -301,6 +301,27 @@ static inline void _generate_special_checked_ptr(
         tcg_gen_mov_i64((TCGv)checked_addr, local_addr);
 #endif
     }
+#ifndef BOUNDS_DO_NOT_WRAP
+    else if (num_bytes > 1) {
+        /*
+         * PCC/DDC spans the whole address space, so the only way out of
+         * bounds is an access that wraps past the top (addr + num_bytes >
+         * 2^64). Ending exactly at the top is fine. Let the bounds helper
+         * raise the length violation in that rare case.
+         */
+        TCGLabel *in_bounds = gen_new_label();
+        tcg_gen_brcondi_tl(TCG_COND_LEU, (TCGv)checked_addr,
+                           -(target_ulong)num_bytes, in_bounds);
+        if (use_ddc) {
+            gen_helper_ddc_check_bounds(tcg_env, (TCGv)checked_addr,
+                                        tcg_constant_tl(num_bytes));
+        } else {
+            gen_helper_pcc_check_bounds(tcg_env, (TCGv)checked_addr,
+                                        tcg_constant_tl(num_bytes));
+        }
+        gen_set_label(in_bounds);
+    }
+#endif
     // PCC/DDC has been checked now and checked_addr can be used directly.
 }
 static inline void
