@@ -2112,9 +2112,15 @@ static RISCVException write_mstatus(CPURISCVState *env, int csrno,
         if (riscv_has_ext(env, RVH)) {
             mask |= MSTATUS_MPV | MSTATUS_GVA;
         }
+#ifndef TARGET_CHERI
+        /*
+         * CHERI builds have a fixed capability format, which is only valid
+         * for RV64, so UXL stays read-only (as in the Sail model).
+         */
         if ((val & MSTATUS64_UXL) != 0) {
             mask |= MSTATUS64_UXL;
         }
+#endif
     }
 
     /* If cfi lp extension is available, then apply cfi lp mask */
@@ -4049,11 +4055,14 @@ static RISCVException write_sstatus(CPURISCVState *env, int csrno,
 {
     target_ulong mask = (sstatus_v1_10_mask);
 
+#ifndef TARGET_CHERI
+    /* CHERI builds keep UXL read-only; see write_mstatus(). */
     if (env->xl != MXL_RV32 || env->debugger) {
         if ((val & SSTATUS64_UXL) != 0) {
             mask |= SSTATUS64_UXL;
         }
     }
+#endif
 
     if (env_archcpu(env)->cfg.ext_zicfilp) {
         mask |= SSTATUS_SPELP;
