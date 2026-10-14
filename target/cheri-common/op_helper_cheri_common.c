@@ -666,6 +666,19 @@ void CHERI_HELPER_IMPL(cbuildcap(CPUArchState *env, uint32_t cd, uint32_t cb,
         return;
     }
 #endif
+#ifdef TARGET_CHERI_RISCV_V9
+    /*
+     * Sail CHERI-RISC-V v9: the requested value is unsealed (unless it is a
+     * sentry) before being checked against and rederived from the authority,
+     * so the result is never sealed and never exceeds the authority.
+     */
+    cap_register_t requested = *ctp;
+    if (!cap_is_sealed_entry(&requested)) {
+        CAP_cc(update_otype)(&requested, CAP_OTYPE_UNSEALED);
+    }
+    ctp = &requested;
+    result = requested;
+#endif
     const cap_register_t *cbp = get_capreg_0_is_ddc(env, cb);
     if (!cbp->cr_tag) {
         raise_cheri_exception_or_invalidate(env, CapEx_TagViolation, cb);
