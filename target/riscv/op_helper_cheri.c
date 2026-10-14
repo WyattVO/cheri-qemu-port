@@ -252,8 +252,13 @@ void HELPER(cspecialrw)(CPUArchState *env, uint32_t cd, uint32_t cs,
     // Make a copy of the write value in case cd == cs
     cap_register_t new_val = *get_readonly_capreg(env, cs);
     if (is_read) {
+        /*
+         * Unlike the standard's CSRRW on extended CSRs, CSpecialRW always
+         * returns the full capability, also outside capability mode (Sail
+         * CHERI-RISC-V v9). The privilege and ASR checks above still apply.
+         */
         cap_register_t csr_cap = ops->read(env, ops);
-        writeback_csrrw(env, csr_cap, cd, ops);
+        update_capreg(env, cd, &csr_cap);
     }
     if (is_write) {
         ops->write(env, ops, new_val, cap_get_cursor(&new_val), /*clen=*/true);
