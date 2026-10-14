@@ -25,6 +25,8 @@
 #include "internals.h"
 #include "pmu.h"
 #include "exec/cputlb.h"
+#include "accel/tcg/probe.h"
+#include "exec/tlb-flags.h"
 #include "exec/log_instr.h"
 #include "exec/page-protection.h"
 #include "exec/target_page.h"
@@ -1942,6 +1944,35 @@ static void rvfi_dii_update_mem_addr(CPURISCVState *env,
     }
 #endif
 }
+
+#if defined(CONFIG_RVFI_DII)
+/*
+ * The Sail model reports physical addresses in rvfi_mem_addr, but QEMU traces
+ * the virtual address when it generates the access. Translate it when the
+ * instruction completes, using the TLB entry the access itself filled: the
+ * instruction may have rewritten the page table it went through (e.g. a store
+ * to its own PTE), so a fresh page walk could give a different address.
+ */
+void riscv_rvfi_dii_translate_mem_addr(CPURISCVState *env)
+{
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    vaddr addr = env->rvfi_dii_trace.MEM.rvfi_mem_addr;
+    MMUAccessType type = env->rvfi_dii_trace.MEM.rvfi_mem_wmask ?
+                         MMU_DATA_STORE : MMU_DATA_LOAD;
+    CPUTLBEntryFull *full;
+    void *host;
+
+    if (!(env->rvfi_dii_trace.available_fields & RVFI_MEM_DATA) ||
+        env->rvfi_dii_trace.INST.rvfi_trap || mmuidx_priv(mmu_idx) == PRV_M) {
+        return;
+    }
+    if (!(probe_access_full(env, addr, 0, type, mmu_idx, true, &host, &full,
+                            0) & TLB_INVALID_MASK)) {
+        env->rvfi_dii_trace.MEM.rvfi_mem_addr =
+            full->phys_addr | (addr & ~TARGET_PAGE_MASK);
+    }
+}
+#endif
 
 static void raise_mmu_exception(CPURISCVState *env, target_ulong address,
                                 MMUAccessType access_type, bool pmp_violation,

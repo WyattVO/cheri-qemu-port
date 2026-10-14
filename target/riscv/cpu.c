@@ -872,6 +872,7 @@ void rvfi_dii_communicate(CPUState* cs, CPURISCVState* env, bool was_trap) {
     // Single-step completed -> update PC in the trace buffer
     env->rvfi_dii_trace.PC.rvfi_pc_wdata = GET_SPECIAL_REG_ARCH(env, pc, pcc);
     env->rvfi_dii_trace.INST.rvfi_order++;
+    riscv_rvfi_dii_translate_mem_addr(env);
 
     // TestRIG expects a zero $pc after a trap:
     if (env->rvfi_dii_trace.INST.rvfi_trap && rvfi_debug_output) {

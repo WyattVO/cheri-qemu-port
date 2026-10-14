@@ -821,6 +821,7 @@ void update_special_register(CPURISCVState *env, cap_register_t *scr,
 #define RVFI_DII_RAM_SIZE (8 * MiB)
 #define RVFI_DII_RAM_END (RVFI_DII_RAM_START + RVFI_DII_RAM_SIZE)
 void rvfi_dii_communicate(CPUState *cs, CPURISCVState *env, bool was_trap);
+void riscv_rvfi_dii_translate_mem_addr(CPURISCVState *env);
 #define CHECK_SAME_TYPE(a, b, msg)                                             \
     _Static_assert(__builtin_types_compatible_p(a*, b*), msg)
 #define rvfi_dii_offset(type, field)                                           \
