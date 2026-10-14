@@ -720,7 +720,13 @@ void CHERI_HELPER_IMPL(cbuildcap(CPUArchState *env, uint32_t cd, uint32_t cb,
 #ifndef TARGET_AARCH64
         cap_set_exec_mode(&derived, cap_get_exec_mode(ctp));
 #endif
-        if (cap_is_sealed_entry(ctp)) {
+        /*
+         * Deriving can clear the tag (e.g. an address that is not
+         * representable with the canonical bounds encoding). Such a result
+         * can never match the requested value, so only seal a tagged one
+         * instead of asserting on guest-controlled input.
+         */
+        if (cap_is_sealed_entry(ctp) && derived.cr_tag) {
             cap_make_sealed_entry(&derived);
         }
         result.cr_tag = 1; /* Set tag to true for comparison with derived. */
