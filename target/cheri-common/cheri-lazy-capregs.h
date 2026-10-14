@@ -337,10 +337,14 @@ static inline void update_capreg_cursor_from(CPUArchState *env, unsigned regnum,
                        CREG_FULLY_DECOMPRESSED);
     cheri_debug_assert(clear_tag ||
                        is_representable_cap_with_addr(source_cap, new_cursor));
-    if (regnum != source_regnum) {
+    /*
+     * When updating in-place, we can avoid copying, but only if source_cap is
+     * the register itself: callers such as CCopyType pass a modified copy
+     * (e.g. with the tag cleared) that must not be dropped when cd == cs.
+     */
+    if (regnum != source_regnum || source_cap != target) {
         *target = *source_cap;
     }
-    /* When updating in-place, we can avoid copying. */
     target->_cr_cursor = new_cursor;
     if (clear_tag) {
         target->cr_tag = 0;
