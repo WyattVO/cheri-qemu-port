@@ -1340,18 +1340,6 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     int mode = mmuidx_priv(mmu_idx);
     bool virt = mmuidx_2stage(mmu_idx);
     bool use_background = false;
-#ifdef CONFIG_RVFI_DII
-    if (env->rvfi_dii_have_injected_insn && access_type == MMU_INST_FETCH) {
-        /*
-         * Pretend we have a 1:1 mapping and never fail for instruction
-         * fetches since the instruction is injected directly via
-         * env->rvfi_dii_injected_insn.
-         */
-        *physical = addr;
-        *ret_prot = PAGE_EXEC;
-        return TRANSLATE_SUCCESS;
-    }
-#endif
     hwaddr ppn;
 
     int napot_bits = 0;
@@ -1518,6 +1506,14 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
         if (pmp_ret != TRANSLATE_SUCCESS) {
             return TRANSLATE_PMP_FAIL;
         }
+#ifdef CONFIG_RVFI_DII
+        /* As for other accesses, TestRIG only has memory in its RAM range. */
+        if (env->rvfi_dii_have_injected_insn &&
+            (pte_addr < RVFI_DII_RAM_START ||
+             pte_addr + sxlen_bytes > RVFI_DII_RAM_END)) {
+            return TRANSLATE_PMP_FAIL;
+        }
+#endif
 
         if (riscv_cpu_mxl(env) == MXL_RV32) {
             pte = address_space_ldl(cs->as, pte_addr, attrs, &res);
