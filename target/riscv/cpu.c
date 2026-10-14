@@ -860,6 +860,9 @@ static void riscv_debug_excp_handler(CPUState *cs)
         return;
     }
 #endif
+#ifndef CONFIG_USER_ONLY
+    riscv_cpu_debug_excp_handler(cs);
+#endif
 }
 
 static void riscv_cpu_reset(DeviceState *dev)
@@ -1624,7 +1627,6 @@ static const struct TCGCPUOps riscv_tcg_ops = {
     .do_interrupt = riscv_cpu_do_interrupt,
     .do_transaction_failed = riscv_cpu_do_transaction_failed,
     .do_unaligned_access = riscv_cpu_do_unaligned_access,
-    .debug_excp_handler = riscv_cpu_debug_excp_handler,
     .debug_check_breakpoint = riscv_cpu_debug_check_breakpoint,
     .debug_check_watchpoint = riscv_cpu_debug_check_watchpoint,
 #endif /* !CONFIG_USER_ONLY */
