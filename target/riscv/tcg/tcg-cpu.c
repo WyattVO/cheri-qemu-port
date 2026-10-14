@@ -1174,6 +1174,99 @@ static void riscv_cpu_enable_implied_rules(RISCVCPU *cpu)
     }
 }
 
+#ifdef TARGET_CHERI
+/*
+ * Extensions whose instructions or CSRs are not yet CHERI-aware. An extension
+ * that touches memory, addresses, control flow or privileged state may only be
+ * enabled on a CHERI hart once it enforces capability checks and is tested;
+ * until then it is disabled here.
+ */
+static const struct {
+    const char *name;
+    uint32_t offset;
+    const char *reason;
+} cheri_unsafe_exts[] = {
+#define CHERI_UNSAFE_EXT(ext, why) { #ext, CPU_CFG_OFFSET(ext_##ext), why }
+    /* Vector loads/stores in vector_helper.c use raw integer addresses. */
+#define VEC "vector loads/stores bypass capability bounds and permission checks"
+    CHERI_UNSAFE_EXT(zve32x, VEC), CHERI_UNSAFE_EXT(zve32f, VEC),
+    CHERI_UNSAFE_EXT(zve64x, VEC), CHERI_UNSAFE_EXT(zve64f, VEC),
+    CHERI_UNSAFE_EXT(zve64d, VEC), CHERI_UNSAFE_EXT(zvfh, VEC),
+    CHERI_UNSAFE_EXT(zvfhmin, VEC), CHERI_UNSAFE_EXT(zvfbfmin, VEC),
+    CHERI_UNSAFE_EXT(zvfbfwma, VEC), CHERI_UNSAFE_EXT(zvbb, VEC),
+    CHERI_UNSAFE_EXT(zvbc, VEC), CHERI_UNSAFE_EXT(zvkb, VEC),
+    CHERI_UNSAFE_EXT(zvkg, VEC), CHERI_UNSAFE_EXT(zvkn, VEC),
+    CHERI_UNSAFE_EXT(zvknc, VEC), CHERI_UNSAFE_EXT(zvkned, VEC),
+    CHERI_UNSAFE_EXT(zvkng, VEC), CHERI_UNSAFE_EXT(zvknha, VEC),
+    CHERI_UNSAFE_EXT(zvknhb, VEC), CHERI_UNSAFE_EXT(zvks, VEC),
+    CHERI_UNSAFE_EXT(zvksc, VEC), CHERI_UNSAFE_EXT(zvksed, VEC),
+    CHERI_UNSAFE_EXT(zvksg, VEC), CHERI_UNSAFE_EXT(zvksh, VEC),
+    CHERI_UNSAFE_EXT(zvkt, VEC),
+#undef VEC
+    /* Pointer masking rewrites addresses outside the capability checks. */
+#define PM "pointer masking changes addresses after capability bounds checks"
+    CHERI_UNSAFE_EXT(smmpm, PM), CHERI_UNSAFE_EXT(smnpm, PM),
+    CHERI_UNSAFE_EXT(ssnpm, PM), CHERI_UNSAFE_EXT(sspm, PM),
+    CHERI_UNSAFE_EXT(supm, PM),
+#undef PM
+    CHERI_UNSAFE_EXT(svrsw60t59b,
+                     "PTE bits 59-60 are CHERI capability permission bits"),
+    CHERI_UNSAFE_EXT(zcmt,
+                     "jump table reads are not checked against PCC or DDC"),
+    CHERI_UNSAFE_EXT(smrnmi,
+                     "mnret changes privilege without restoring PCC"),
+#undef CHERI_UNSAFE_EXT
+};
+
+static bool cpu_cfg_ext_user_enabled(uint32_t ext_offset)
+{
+    return GPOINTER_TO_UINT(g_hash_table_lookup(multi_ext_user_opts,
+                                                GUINT_TO_POINTER(ext_offset)));
+}
+
+/*
+ * Disable extensions that would let guest code bypass CHERI protection.
+ * Explicitly requesting one (e.g. v=true) is an error; one enabled implicitly
+ * by a CPU model, profile or implied rule (e.g. -cpu max) is turned off.
+ */
+static void riscv_cpu_cheri_disable_unsafe_exts(RISCVCPU *cpu, Error **errp)
+{
+    CPURISCVState *env = &cpu->env;
+
+    if (!cpu->cfg.ext_cheri) {
+        return;
+    }
+    if (riscv_has_ext(env, RVV)) {
+        if (GPOINTER_TO_UINT(g_hash_table_lookup(misa_ext_user_opts,
+                                                 GUINT_TO_POINTER(RVV)))) {
+            error_setg(errp, "Extension v is not supported on CHERI CPUs: "
+                       "vector loads/stores bypass capability bounds and "
+                       "permission checks");
+            return;
+        }
+        warn_report("Disabling extension v on CHERI CPU: vector loads/stores "
+                    "bypass capability bounds and permission checks");
+        riscv_cpu_set_misa_ext(env, env->misa_ext & ~RVV);
+        env->misa_ext_mask &= ~RVV;
+    }
+    for (size_t i = 0; i < ARRAY_SIZE(cheri_unsafe_exts); i++) {
+        uint32_t offset = cheri_unsafe_exts[i].offset;
+
+        if (!isa_ext_is_enabled(cpu, offset)) {
+            continue;
+        }
+        if (cpu_cfg_ext_user_enabled(offset)) {
+            error_setg(errp, "Extension %s is not supported on CHERI CPUs: %s",
+                       cheri_unsafe_exts[i].name, cheri_unsafe_exts[i].reason);
+            return;
+        }
+        warn_report("Disabling extension %s on CHERI CPU: %s",
+                    cheri_unsafe_exts[i].name, cheri_unsafe_exts[i].reason);
+        isa_ext_update_enabled(cpu, offset, false);
+    }
+}
+#endif
+
 void riscv_tcg_cpu_finalize_features(RISCVCPU *cpu, Error **errp)
 {
     CPURISCVState *env = &cpu->env;
@@ -1181,6 +1274,14 @@ void riscv_tcg_cpu_finalize_features(RISCVCPU *cpu, Error **errp)
 
     riscv_cpu_init_implied_exts_rules();
     riscv_cpu_enable_implied_rules(cpu);
+
+#ifdef TARGET_CHERI
+    riscv_cpu_cheri_disable_unsafe_exts(cpu, &local_err);
+    if (local_err != NULL) {
+        error_propagate(errp, local_err);
+        return;
+    }
+#endif
 
     riscv_cpu_validate_misa_priv(env, &local_err);
     if (local_err != NULL) {
