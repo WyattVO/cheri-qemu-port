@@ -5960,10 +5960,11 @@ static RISCVException write_ccsr(CPURISCVState *env, int csrno, target_ulong val
 {
     switch (csrno) {
     default:
-        error_report("Attempting to write " TARGET_FMT_lx
-                     "to xCCSR(%#x), this is not supported (yet?).",
-                     val, csrno);
-        return RISCV_EXCP_INST_ACCESS_FAULT;
+        /*
+         * mccsr and uccsr only have read-only feature bits (as in the Sail
+         * model), so writes are ignored.
+         */
+        break;
 #if !defined(TARGET_RISCV32)
     case CSR_SCCSR: {
         static const target_ulong gclgmask = (SCCSR_SGCLG | SCCSR_UGCLG);
