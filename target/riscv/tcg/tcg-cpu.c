@@ -1233,9 +1233,10 @@ static void riscv_cpu_cheri_disable_unsafe_exts(RISCVCPU *cpu, Error **errp)
 {
     CPURISCVState *env = &cpu->env;
 
-    if (!cpu->cfg.ext_cheri) {
-        return;
-    }
+    /*
+     * Don't check cfg.ext_cheri: bare and profile CPUs don't set it until
+     * reset, which always turns it on.
+     */
     if (riscv_has_ext(env, RVV)) {
         if (GPOINTER_TO_UINT(g_hash_table_lookup(misa_ext_user_opts,
                                                  GUINT_TO_POINTER(RVV)))) {
