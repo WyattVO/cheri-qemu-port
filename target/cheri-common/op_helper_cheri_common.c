@@ -799,9 +799,11 @@ static void cseal_common(CPUArchState *env, uint32_t cd, uint32_t cs,
             return;
         }
         raise_cheri_exception_or_invalidate(env, CapEx_TagViolation, ct);
-    } else if (!csp->cr_tag) {
-        raise_cheri_exception_or_invalidate(env, CapEx_TagViolation, cs);
     } else if (conditional && !cap_is_unsealed(csp)) {
+        /*
+         * CCSeal passes cs through unchanged in these cases before looking
+         * at cs's tag (Sail CHERI-RISC-V v9), e.g. an untagged sentry.
+         */
         update_capreg(env, cd, csp);
         return;
     } else if (conditional && !cap_cursor_in_bounds(ctp)) {
@@ -811,6 +813,8 @@ static void cseal_common(CPUArchState *env, uint32_t cd, uint32_t cs,
                cap_get_cursor(ctp) == CAP_OTYPE_UNSEALED_SIGNED) {
         update_capreg(env, cd, csp);
         return;
+    } else if (!csp->cr_tag) {
+        raise_cheri_exception_or_invalidate(env, CapEx_TagViolation, cs);
     } else if (!conditional && !cap_is_unsealed(csp)) {
         raise_cheri_exception_or_invalidate(env, CapEx_SealViolation, cs);
     } else if (!cap_is_unsealed(ctp)) {
