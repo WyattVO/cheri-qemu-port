@@ -2639,7 +2639,7 @@ static RISCVCPUProfile RVA23U64 = {
  *
  * The remaining features/extensions comes from RVA23S64.
  */
-static RISCVCPUProfile RVA23S64 = {
+static RISCVCPUProfile RVA23S64 G_GNUC_UNUSED = {
     .u_parent = &RVA23U64,
     .s_parent = &RVA22S64,
     .name = "rva23s64",
@@ -2660,9 +2660,15 @@ static RISCVCPUProfile RVA23S64 = {
 
 RISCVCPUProfile *riscv_profiles[] = {
     &RVA22U64,
-    &RVA22S64,
     &RVA23U64,
+    /*
+     * The S-mode profiles need Svpbmt/Svnapot, whose PTE bits are CHERI
+     * permission bits in v9.
+     */
+#if !defined(TARGET_CHERI_RISCV_V9)
+    &RVA22S64,
     &RVA23S64,
+#endif
     NULL,
 };
 
@@ -3878,9 +3884,11 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     ),
 
     DEFINE_PROFILE_CPU(TYPE_RISCV_CPU_RVA22U64,  TYPE_RISCV_CPU_RV64I,  RVA22U64),
-    DEFINE_PROFILE_CPU(TYPE_RISCV_CPU_RVA22S64,  TYPE_RISCV_CPU_RV64I,  RVA22S64),
     DEFINE_PROFILE_CPU(TYPE_RISCV_CPU_RVA23U64,  TYPE_RISCV_CPU_RV64I,  RVA23U64),
+#if !defined(TARGET_CHERI_RISCV_V9)
+    DEFINE_PROFILE_CPU(TYPE_RISCV_CPU_RVA22S64,  TYPE_RISCV_CPU_RV64I,  RVA22S64),
     DEFINE_PROFILE_CPU(TYPE_RISCV_CPU_RVA23S64,  TYPE_RISCV_CPU_RV64I,  RVA23S64),
+#endif
 #endif /* TARGET_RISCV64 */
 };
 
