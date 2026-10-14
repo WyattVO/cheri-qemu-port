@@ -1441,6 +1441,19 @@ static bool riscv_tcg_cpu_realize(CPUState *cs, Error **errp)
         return false;
     }
 
+#if defined(TARGET_CHERI) && defined(TARGET_RISCV64)
+    /*
+     * The capability format is fixed at build time: this binary uses
+     * 128-bit capabilities, which are only valid for RV64.
+     */
+    if (mcc->def->misa_mxl_max != MXL_RV64) {
+        g_autofree char *name = riscv_cpu_get_name(cpu);
+        error_setg(errp, "'%s' CPU is not RV64; use a riscv32 CHERI build for "
+                   "RV32 CHERI CPUs", name);
+        return false;
+    }
+#endif
+
     CPURISCVState *env = &cpu->env;
 
 #ifdef TARGET_CHERI
