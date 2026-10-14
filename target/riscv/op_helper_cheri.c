@@ -71,6 +71,49 @@ static void check_csr_cap_permissions(CPURISCVState *env, uint32_t csrno,
     }
 }
 
+/*
+ * Whether a CSR instruction accesses the full capability of an extended
+ * register. In the standard this depends on capability mode. In CHERI-RISC-V
+ * v9 CSR instructions only ever access the address: capabilities are read and
+ * written with CSpecialRW (Sail CHERI-RISC-V v9).
+ */
+static inline bool csr_access_is_clen(CPUArchState *env)
+{
+#ifdef TARGET_CHERI_RISCV_V9
+    return false;
+#else
+    return cheri_in_capmode(env);
+#endif
+}
+
+/*
+ * In CHERI-RISC-V v9 only the RISC-V CSRs that CHERI extends (xtvec, xepc,
+ * xscratch) exist as CSRs. Registers such as DDC, xTDC and xTIDC are special
+ * capability registers that are only reachable with CSpecialRW, so CSR
+ * instructions naming them are illegal (Sail CHERI-RISC-V v9).
+ */
+static void check_csr_insn_exists(CPURISCVState *env,
+                                  riscv_csr_cap_ops *csr_cap_info,
+                                  uintptr_t hostpc)
+{
+#ifdef TARGET_CHERI_RISCV_V9
+    switch (csr_cap_info->reg_num) {
+    case CSR_MTVECC:
+    case CSR_STVECC:
+    case CSR_VSTVECC:
+    case CSR_MEPCC:
+    case CSR_SEPCC:
+    case CSR_VSEPCC:
+    case CSR_MSCRATCHC:
+    case CSR_SSCRATCHC:
+    case CSR_VSSCRATCHC:
+        return;
+    default:
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, hostpc);
+    }
+#endif
+}
+
 /* Copy a capability to a register, or update address if we are not capmode.*/
 static inline void writeback_csrrw(CPUArchState *env, cap_register_t cap,
                                    uint32_t cd, riscv_csr_cap_ops *csr_cap_info)
@@ -78,7 +121,7 @@ static inline void writeback_csrrw(CPUArchState *env, cap_register_t cap,
     tcg_debug_assert(cd != 0);
     if (csr_cap_info->flags & CSR_OP_EXTENDED_REG) {
         /* Extended register -> reads return CLEN only in capmode */
-        if (!cheri_in_capmode(env)) {
+        if (!csr_access_is_clen(env)) {
             update_capreg_to_intval(env, cd, cap_get_cursor(&cap));
         } else {
             update_capreg(env, cd, &cap);
@@ -95,6 +138,7 @@ void HELPER(csrrw_cap)(CPUArchState *env, uint32_t csr, uint32_t rd,
     riscv_csr_cap_ops *csr_cap_info = get_csr_cap_info(csr);
     assert(csr_cap_info);
 
+    check_csr_insn_exists(env, csr_cap_info, GETPC());
     check_csr_cap_permissions(env, csr, true, csr_cap_info, GETPC());
     /* Read rs1 first since it could be clobbered by writeback_csrrw */
     cap_register_t rs_cap = *get_readonly_capreg(env, rs1);
@@ -104,7 +148,7 @@ void HELPER(csrrw_cap)(CPUArchState *env, uint32_t csr, uint32_t rd,
     }
     /* CSRRW always performs the write operation even for rs1=zero. */
     csr_cap_info->write(env, csr_cap_info, rs_cap, cap_get_cursor(&rs_cap),
-                        cheri_in_capmode(env));
+                        csr_access_is_clen(env));
 }
 
 static inline void do_csr_set_clear(CPUArchState *env, uint32_t csr,
@@ -115,6 +159,7 @@ static inline void do_csr_set_clear(CPUArchState *env, uint32_t csr,
     riscv_csr_cap_ops *csr_cap_info = get_csr_cap_info(csr);
 
     assert(csr_cap_info);
+    check_csr_insn_exists(env, csr_cap_info, GETPC());
     check_csr_cap_permissions(env, csr, perform_write, csr_cap_info, GETPC());
     /*
      * CSRR{S,C}* Always perform a read operation even for rd==0
@@ -158,6 +203,7 @@ void HELPER(csrrwi_cap)(CPUArchState *env, uint32_t csr, uint32_t rd,
     riscv_csr_cap_ops *csr_cap_info = get_csr_cap_info(csr);
     assert(csr_cap_info);
 
+    check_csr_insn_exists(env, csr_cap_info, GETPC());
     check_csr_cap_permissions(env, csr, true, csr_cap_info, GETPC());
     /*
      * NOTE: according to spec read should not be visible for rd=0, but we
