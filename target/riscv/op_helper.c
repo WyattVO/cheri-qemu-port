@@ -70,7 +70,10 @@ G_NORETURN void riscv_raise_exception(CPURISCVState *env,
 #ifdef CONFIG_RVFI_DII
     if (exception == RISCV_EXCP_ILLEGAL_INST &&
         env->rvfi_dii_have_injected_insn) {
-        env->badaddr = env->rvfi_dii_injected_insn;
+        /* A compressed instruction is only the low 16 bits of the word. */
+        env->badaddr = (env->rvfi_dii_injected_insn & 3) == 3
+                           ? env->rvfi_dii_injected_insn
+                           : (uint16_t)env->rvfi_dii_injected_insn;
     } else
 #endif
     if (exception == RISCV_EXCP_ILLEGAL_INST) {
