@@ -94,8 +94,15 @@ static inline bool gen_sc_impl(DisasContext *ctx, TCGv_cap_checked_ptr addr,
         TCGv_i32 tmop = tcg_constant_i32(mop);
         TCGv_i32 tcode = tcg_constant_i32(RISCV_EXCP_STORE_AMO_ADDR_MIS);
         gen_helper_check_alignment(tcg_env, (TCGv)addr, tmop, tcode);
+    } else {
+        /*
+         * load_res == -1 means "no reservation". A byte SC to the last byte of
+         * the address space is aligned and would match it, so treat that
+         * address as never reserved: fail the SC instead of accessing memory.
+         */
+        tcg_gen_brcondi_tl(TCG_COND_EQ, (TCGv)addr, -1, l1);
     }
- 
+
 #ifdef TARGET_CHERI
     tcg_gen_brcond_cap_checked(TCG_COND_NE, load_res, addr, l1);
 #else
