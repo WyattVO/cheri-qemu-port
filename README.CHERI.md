@@ -3,6 +3,9 @@ Qemu-CHERI
 
 CHERI ISA support for Qemu.
 
+> For the QEMU 10.2 CHERI-RISC-V port on this branch (`cheri-10.2`), what was
+> changed, how it is tested and how to build and run it, see [README.md](README.md).
+
 
 Building and Installing qemu-system-cheri (recommended)
 -----------------------------------------
