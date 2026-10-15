@@ -276,6 +276,17 @@ target_ulong CHERI_HELPER_IMPL(cgetlen(CPUArchState *env, uint32_t cb))
     return (target_ulong)cap_get_length_sat(get_readonly_capreg(env, cb));
 }
 
+target_ulong CHERI_HELPER_IMPL(cgettop(CPUArchState *env, uint32_t cb))
+{
+    /*
+     * CGetTop: Move Top to a General-Purpose Register.
+     *
+     * Note: For 128-bit Capabilities the top can be 2^64; like the Sail
+     * model, cap_get_top() returns UINT64_MAX in that case.
+     */
+    return cap_get_top(get_readonly_capreg(env, cb));
+}
+
 target_ulong CHERI_HELPER_IMPL(cgetperm(CPUArchState *env, uint32_t cb))
 {
     /*
