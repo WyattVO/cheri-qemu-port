@@ -268,8 +268,12 @@ struct CPUTLBEntryFull {
     /* @attrs contains the memory transaction attributes for the page. */
     MemTxAttrs attrs;
 
-    /* @prot contains the complete protections for the page. */
-    uint8_t prot;
+    /*
+     * @prot contains the complete protections for the page. Not uint8_t:
+     * the CHERI PAGE_LC_* and PAGE_SC_* bits are above bit 7 (as in
+     * CHERI-Alliance, which uses uint32_t).
+     */
+    uint32_t prot;
 
     /* @lg_page_size contains the log2 of the page size. */
     uint8_t lg_page_size;

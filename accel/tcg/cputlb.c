@@ -1066,6 +1066,9 @@ void tlb_set_page_full(CPUState *cpu, int mmu_idx,
               addr, full->phys_addr, prot, mmu_idx);
 
 #ifdef TARGET_CHERI
+    /* The CHERI flags travel in full->prot; it must be wide enough. */
+    QEMU_BUILD_BUG_ON((typeof_field(CPUTLBEntryFull, prot))PAGE_C_BITS !=
+                      PAGE_C_BITS);
     bool tag_setting = full->attrs.tag_setting != 0;
     /*
      * Getting tagmem can cause an invalidation, so best to do this before
