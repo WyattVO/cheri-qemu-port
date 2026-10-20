@@ -644,7 +644,7 @@ static inline bool gen_sc_impl(DisasContext *ctx, TCGv_cap_checked_ptr addr,
         REQUIRE_EXT(ctx, RVA);                                                 \
         TCGv_cap_checked_ptr addr = tcg_temp_new_cap_checked();                \
         generate_get_ddc_checked_gpr_plus_offset(                              \
-            addr, ctx, a->rs1, 0, op, &generate_ddc_checked_load_ptr);         \
+            addr, ctx, a->rs1, 0, op, &generate_ddc_checked_store_ptr);         \
         a->rd = a->rs2; /* Not enough encoding space for explicit rd */        \
         return gen_sc_impl(ctx, addr, a, op);                                  \
     }                                                                          \
@@ -652,7 +652,7 @@ static inline bool gen_sc_impl(DisasContext *ctx, TCGv_cap_checked_ptr addr,
     {                                                                          \
         REQUIRE_EXT(ctx, RVA);                                                 \
         TCGv_cap_checked_ptr addr = tcg_temp_new_cap_checked();                \
-        generate_cap_load_check_imm(addr, a->rs1, 0, op);                      \
+        generate_cap_store_check_imm(addr, a->rs1, 0, op);                      \
         a->rd = a->rs2; /* Not enough encoding space for explicit rd */        \
         return gen_sc_impl(ctx, addr, a, op);                                  \
     }

@@ -148,8 +148,9 @@ static inline bool gen_sc_impl(DisasContext *ctx, TCGv_cap_checked_ptr addr,
 
 static inline bool gen_sc(DisasContext *ctx, arg_atomic *a, MemOp mop)
 {
+    /* A store-conditional is a store: its authority needs Store permission. */
     TCGv_cap_checked_ptr addr =
-        get_capmode_dependent_load_addr(ctx, a->rs1, 0, mop);
+        get_capmode_dependent_store_addr(ctx, a->rs1, 0, mop);
     cheri_debug_assert((mop & MO_ALIGN) && "store-conditional must be aligned");
     bool result = gen_sc_impl(ctx, addr, a, mop);
     return result;
