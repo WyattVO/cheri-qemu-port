@@ -383,12 +383,18 @@ void HELPER(amoswap_cap)(CPUArchState *env, uint32_t dest_reg,
     } else if (!cap_has_perms(cbp, CAP_PERM_STORE)) {
         raise_cheri_exception(env, CapEx_PermitStoreViolation, addr_reg);
 #ifndef TARGET_CHERI_RISCV_STD /* RISC-V Standard CHERI tag clears instead. */
-    } else if (!cap_has_perms(cbp, CAP_PERM_STORE_CAP)) {
+    /*
+     * As for csc: StoreCap and StoreLocalCap only matter when the stored
+     * value is tagged, and the authorizing capability is the one reported.
+     */
+    } else if (!cap_has_perms(cbp, CAP_PERM_STORE_CAP) &&
+               get_capreg_tag(env, val_reg)) {
         raise_cheri_exception(env, CapEx_PermitStoreCapViolation, addr_reg);
     } else if (!cap_has_perms(cbp, CAP_PERM_STORE_LOCAL) &&
                get_capreg_tag(env, val_reg) &&
                !(get_capreg_hwperms(env, val_reg) & CAP_PERM_GLOBAL)) {
-        raise_cheri_exception(env, CapEx_PermitStoreLocalCapViolation, val_reg);
+        raise_cheri_exception(env, CapEx_PermitStoreLocalCapViolation,
+                              addr_reg);
 #endif
     }
 
@@ -518,12 +524,18 @@ static target_ulong sc_c_impl(CPUArchState *env, uint32_t addr_reg,
     } else if (!cap_has_perms(auth_cap, CAP_PERM_STORE)) {
         raise_cheri_exception(env, CapEx_PermitStoreViolation, addr_reg);
 #ifndef TARGET_CHERI_RISCV_STD
-    } else if (!cap_has_perms(auth_cap, CAP_PERM_STORE_CAP)) {
+    /*
+     * As for csc: StoreCap and StoreLocalCap only matter when the stored
+     * value is tagged, and the authorizing capability is the one reported.
+     */
+    } else if (!cap_has_perms(auth_cap, CAP_PERM_STORE_CAP) &&
+               get_capreg_tag(env, val_reg)) {
         raise_cheri_exception(env, CapEx_PermitStoreCapViolation, addr_reg);
     } else if (!cap_has_perms(auth_cap, CAP_PERM_STORE_LOCAL) &&
                get_capreg_tag(env, val_reg) &&
                !(get_capreg_hwperms(env, val_reg) & CAP_PERM_GLOBAL)) {
-        raise_cheri_exception(env, CapEx_PermitStoreLocalCapViolation, val_reg);
+        raise_cheri_exception(env, CapEx_PermitStoreLocalCapViolation,
+                              addr_reg);
 #endif
     }
 
