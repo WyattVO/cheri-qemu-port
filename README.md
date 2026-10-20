@@ -14,7 +14,7 @@ The port is RISC-V only. The upstream QEMU documentation is in
 | QEMU 10.2.0 | upstream QEMU |
 | CHERI support (CHERI-RISC-V v9, CHERI-MIPS, Morello) | [CTSRD-CHERI/qemu](https://github.com/CTSRD-CHERI/qemu), QEMU 7.x based |
 | Port of that CHERI support to QEMU 10.2 | Kenny Root, [kruton/cheri-qemu](https://github.com/kruton/cheri-qemu) branch `cheri-10.2.0-stacked-commits` (up to `35798f7560`) |
-| TestRIG bring-up, bug fixes and CHERI extension policy | Wyatt Voigt, this branch (33 commits on top, listed below) |
+| TestRIG bring-up, bug fixes and CHERI extension policy | Wyatt Voigt, this branch (commits on top, listed below) |
 
 Branches in this fork:
 
@@ -115,6 +115,12 @@ TestRIG fork (`regressions/`), so it can't come back unnoticed.
 - `01b83dce17` A byte store-conditional (`sc.b`) to `0xffffffffffffffff` without
   a reservation took a load access fault instead of failing (also in CHERI-QEMU
   7.1).
+- Store-conditionals (`sc.b/h/w/d` and the explicit `sc.*.ddc`/`sc.*.cap`)
+  checked their authority for Load instead of Store permission, so an SC
+  through a Load-only DDC or capability wrote memory (also in CHERI-QEMU 7.1).
+- `cbo.inval` only rejected a cache block entirely outside its authority's
+  bounds; like `cbo.zero` it now needs the whole block in bounds (riscv-cheri
+  spec), since invalidation can re-expose older data and capabilities.
 
 ### Known differences from the Sail model
 
@@ -198,6 +204,11 @@ It must end with `TESTRIG GATE: PASS`. Run it after every change to this
 branch.
 
 ## Not done yet
+
+- SMP with MTTCG: CHERI tags are not thread-safe across host threads (QEMU
+  warns when `-accel tcg,thread=multi` is given; a forged capability is
+  observable and `cbo.zero` aborts QEMU). The default for CHERI, round-robin
+  TCG, is safe; use it for `-smp`.
 
 - Rebasing onto QEMU 11.
 - Making vector CHERI-aware, which is needed before it can be enabled.
