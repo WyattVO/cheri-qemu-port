@@ -467,9 +467,12 @@ void helper_cbo_inval_cap(CPURISCVState *env, uint32_t addr_reg)
     /* Mask off low-bits to align-down to the cache-block. */
     address &= ~(cbomlen - 1);
 
-    /* Check if the block is entirely outside the bounds */
-    if ((address >= cap_get_top_full(auth_cap)) ||
-        (cap_get_base(auth_cap) >= (cap_length_t)address + cbomlen)) {
+    /*
+     * Invalidation discards the whole block, which can re-expose older data
+     * and capabilities, so every byte of it must be in bounds (unlike
+     * cbo.clean/cbo.flush, which only need one byte).
+     */
+    if (!cap_is_in_bounds(auth_cap, address, cbomlen)) {
         raise_cheri_exception(env, CapEx_LengthViolation, auth_reg);
     }
     check_zicbom_access(env, address, _host_return_address);
