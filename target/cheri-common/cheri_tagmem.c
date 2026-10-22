@@ -266,7 +266,8 @@ void cheri_tag_init(MemoryRegion *mr, uint64_t memory_size)
         error_report("%s: Can't allocated tag memory", __func__);
         exit(-1);
     }
-    if (qemu_tcg_mttcg_enabled()) {
+    /* qemu_tcg_mttcg_enabled() asserts that the accelerator is TCG. */
+    if (tcg_enabled() && qemu_tcg_mttcg_enabled()) {
         warn_report("The CHERI tagged memory implementation is not thread-safe "
                     "and therefore not compatible with MTTCG. Capability tags "
                     "may mysteriously appear/disappear. Run with \"--accel "
