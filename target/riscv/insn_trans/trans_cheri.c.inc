@@ -263,6 +263,29 @@ static bool trans_cclear(DisasContext *ctx, arg_cclear *a)
     return true;
 }
 
+// FPClear q, m: zero FP registers 8*q+i for each set bit i of m
+static bool trans_fpclear(DisasContext *ctx, arg_fpclear *a)
+{
+    uint32_t q = a->rs1 >> 3;
+    uint32_t mask = ((a->rs1 & 7) << 5) | a->rd;
+
+    // Same check as REQUIRE_FPU (defined later, in trans_rvf.c.inc).
+    if (!has_ext(ctx, RVF) || ctx->mstatus_fs == EXT_STATUS_DISABLED) {
+        return false;
+    }
+    for (uint32_t i = 0; i < 8; i++) {
+        if (mask & (1u << i)) {
+            // FLEN-wide zero, not a NaN-boxed single.
+            tcg_gen_movi_i64(cpu_fpr[8 * q + i], 0);
+        }
+    }
+    // Only register writes dirty FS, so an empty mask leaves it unchanged.
+    if (mask) {
+        mark_fs_dirty(ctx);
+    }
+    return true;
+}
+
 // Three operand (cap cap int)
 TRANSLATE_CAP_CAP_INT(candperm)
 TRANSLATE_CAP_CAP_INT(cfromptr)
