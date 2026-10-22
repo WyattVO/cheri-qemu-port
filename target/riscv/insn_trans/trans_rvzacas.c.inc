@@ -121,13 +121,16 @@ static bool trans_amocas_q(DisasContext *ctx, arg_amocas_q *a)
     TCGv_i128 src2 = tcg_temp_new_i128();
     TCGv_i64 src2l = get_gpr(ctx, a->rs2, EXT_NONE);
     TCGv_i64 src2h = get_gpr(ctx, a->rs2 == 0 ? 0 : a->rs2 + 1, EXT_NONE);
-    TCGv_i64 destl = get_gpr(ctx, a->rd, EXT_NONE);
-    TCGv_i64 desth = get_gpr(ctx, a->rd == 0 ? 0 : a->rd + 1, EXT_NONE);
+    TCGv_i64 cmpl = get_gpr(ctx, a->rd, EXT_NONE);
+    TCGv_i64 cmph = get_gpr(ctx, a->rd == 0 ? 0 : a->rd + 1, EXT_NONE);
+    /* Not cmpl/cmph: for rd = x0 those are the shared constant zero. */
+    TCGv_i64 destl = tcg_temp_new_i64();
+    TCGv_i64 desth = tcg_temp_new_i64();
     MemOp memop = MO_ALIGN | MO_UO;
 
     memop |= mo_endian(ctx);
     tcg_gen_concat_i64_i128(src2, src2l, src2h);
-    tcg_gen_concat_i64_i128(dest, destl, desth);
+    tcg_gen_concat_i64_i128(dest, cmpl, cmph);
     decode_save_opc(ctx, RISCV_UW2_ALWAYS_STORE_AMO);
     tcg_gen_atomic_cmpxchg_i128_with_checked_addr(dest, src1, dest, src2, ctx->mem_idx, memop);
 
