@@ -667,6 +667,14 @@ void mseccfg_csr_write(CPURISCVState *env, target_ulong val)
         }
     }
 
+    /*
+     * Without Smmpm, mseccfg.PMM is read-only zero (WARL); the Smepmp path
+     * below stores val unmasked, so drop the field here.
+     */
+    if (!(mask & MSECCFG_PMM)) {
+        val = (val & ~MSECCFG_PMM) | (env->mseccfg & MSECCFG_PMM);
+    }
+
     if (riscv_cpu_cfg(env)->ext_smepmp) {
         /* Sticky bits */
         val |= (env->mseccfg & mask);
