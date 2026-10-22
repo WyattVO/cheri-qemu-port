@@ -1004,6 +1004,24 @@ static void tlb_add_large_page(CPUState *cpu, int mmu_idx,
     cpu->neg.tlb.d[mmu_idx].large_page_mask = lp_mask;
 }
 
+/*
+ * The slow flags (e.g. TLB_WATCHPOINT) of the comparator that @access_type
+ * uses. CHERI capability loads/stores use the data load/store comparators
+ * (see tlb_read_idx()), so they must use those comparators' slow flags too.
+ */
+static inline int tlb_slow_flags(CPUTLBEntryFull *full,
+                                 MMUAccessType access_type)
+{
+#ifdef TARGET_CHERI
+    if (access_type == MMU_DATA_CAP_LOAD) {
+        access_type = MMU_DATA_LOAD;
+    } else if (access_type == MMU_DATA_CAP_STORE) {
+        access_type = MMU_DATA_STORE;
+    }
+#endif
+    return full->slow_flags[access_type];
+}
+
 static inline void tlb_set_compare(CPUTLBEntryFull *full, CPUTLBEntry *ent,
                                    vaddr address, int flags,
                                    MMUAccessType access_type, bool enable)
@@ -1464,7 +1482,7 @@ probe_access_internal(CPUState *cpu, vaddr addr, int fault_size,
     flags &= tlb_addr;
 
     *pfull = full = &cpu->neg.tlb.d[mmu_idx].fulltlb[index];
-    flags |= full->slow_flags[access_type];
+    flags |= tlb_slow_flags(full, access_type);
 
     /* Fold all "mmio-like" bits into TLB_MMIO.  This is not RAM.  */
     if (unlikely(flags & ~(TLB_WATCHPOINT | TLB_NOTDIRTY | TLB_CHECK_ALIGNED))
@@ -1739,7 +1757,7 @@ static bool mmu_lookup1(CPUState *cpu, MMULookupPageData *data, MemOp memop,
 
     full = &cpu->neg.tlb.d[mmu_idx].fulltlb[index];
     flags = tlb_addr & (TLB_FLAGS_MASK & ~TLB_FORCE_SLOW);
-    flags |= full->slow_flags[access_type];
+    flags |= tlb_slow_flags(full, access_type);
 
     if (likely(!maybe_resized)) {
         /* Alignment has not been checked by tlb_fill_align. */
