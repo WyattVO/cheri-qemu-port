@@ -557,6 +557,7 @@ static void hobgoblin_add_uartlite(HobgoblinState *s,
     qemu_irq irq = hobgoblin_make_plic_irq(s, HIRQ(s, HOBGOBLIN_UART1_IRQ));
 
     DeviceState *dev = qdev_new(TYPE_XILINX_UARTLITE);
+    qdev_prop_set_enum(dev, "endianness", ENDIAN_MODE_LITTLE);
     qdev_prop_set_chr(dev, "chardev", chardev);
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, mem_uart->base);
@@ -599,6 +600,7 @@ static void hobgoblin_add_spi(HobgoblinState *s)
 
     /* create SPI device */
     DeviceState *spi = qdev_new(TYPE_XILINX_SPI);
+    qdev_prop_set_enum(spi, "endianness", ENDIAN_MODE_LITTLE);
     SysBusDevice *bus_spi = SYS_BUS_DEVICE(spi);
     sysbus_realize_and_unref(bus_spi, &error_fatal);
     sysbus_mmio_map(bus_spi, 0, mem_spi->base);
@@ -612,11 +614,10 @@ static void hobgoblin_add_spi(HobgoblinState *s)
 static void hobgoblin_add_sd(HobgoblinState *s)
 {
     /* create SD Card in SPI mode */
-    DeviceState *sd_card_spi = qdev_new(TYPE_SD_CARD);
+    DeviceState *sd_card_spi = qdev_new(TYPE_SD_CARD_SPI);
     DriveInfo *dinfo = drive_get(IF_SD, 0, 0);
     BlockBackend *blk = dinfo ? blk_by_legacy_dinfo(dinfo) : NULL;
     qdev_prop_set_drive_err(sd_card_spi, "drive", blk, &error_fatal);
-    qdev_prop_set_bit(sd_card_spi, "spi", true);
 
     /* Connect SD card to SPI */
     SSIBus *bus_ssi = (SSIBus *)qdev_get_child_bus(s->spi, "spi");
@@ -649,6 +650,7 @@ static void hobgoblin_add_ethernetlite(HobgoblinState *s)
 
     /* Ethernet (ethernetlite) */
     DeviceState *eth = qdev_new(model);
+    qdev_prop_set_enum(eth, "endianness", ENDIAN_MODE_LITTLE);
     qemu_configure_nic_device(eth, true, NULL);
 
     SysBusDevice *bus_eth = SYS_BUS_DEVICE(eth);
@@ -762,6 +764,7 @@ static void hobgoblin_add_timer(HobgoblinState *s)
     const memmapEntry_t *memmap = address_maps[MAPVERSION(s)];
 
     s->timer = qdev_new("xlnx.xps-timer");
+    qdev_prop_set_enum(s->timer, "endianness", ENDIAN_MODE_LITTLE);
     qdev_prop_set_uint32(s->timer, "one-timer-only", 1);
     qdev_prop_set_uint32(s->timer, "clock-frequency", 100 * 1000000);
     ss = SYS_BUS_DEVICE(s->timer);
