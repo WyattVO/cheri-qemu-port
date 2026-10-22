@@ -121,6 +121,11 @@ TestRIG fork (`regressions/`), so it can't come back unnoticed.
 - `cbo.inval` only rejected a cache block entirely outside its authority's
   bounds; like `cbo.zero` it now needs the whole block in bounds (riscv-cheri
   spec), since invalidation can re-expose older data and capabilities.
+- Capability stores ignored Sdtrig data triggers (watchpoints): the TLB
+  slow flags were looked up with the CHERI access type instead of the
+  data-store one (a regression from the 10.x TLB rework).
+- `mseccfg.PMM` was writable without Smmpm when Smepmp is enabled (upstream
+  QEMU bug; pointer masking itself stayed off).
 
 ### Known differences from the Sail model
 
