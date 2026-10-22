@@ -2620,7 +2620,7 @@ static bool get_phys_addr_pmsav5(CPUARMState *env,
 }
 
 static void get_phys_addr_pmsav7_default(CPUARMState *env, ARMMMUIdx mmu_idx,
-                                         int32_t address, uint8_t *prot)
+                                         int32_t address, uint32_t *prot)
 {
     if (!arm_feature(env, ARM_FEATURE_M)) {
         *prot = PAGE_READ | PAGE_WRITE;
