@@ -3842,8 +3842,7 @@ static void gen_store_exclusive(DisasContext *s, int rd, int rt, int rt2,
     TCGLabel *fail_label = gen_new_label();
     TCGLabel *done_label = gen_new_label();
     TCGv_i64 tmp = tcg_temp_new_i64();
-    tcg_gen_mov_i64(tmp, cpu_reg_sp(s, rn));
-    G_GNUC_UNUSED TCGv_cap_checked_ptr clean_addr;
+    TCGv_cap_checked_ptr clean_addr;
     MemOp memop;
 
     /* Perform MTE and CHERI checks before monitor check, as architectural checks must happen regardless of monitor state. */
@@ -3857,9 +3856,13 @@ static void gen_store_exclusive(DisasContext *s, int rd, int rt, int rt2,
                                           tag_checked, memop & ~MO_ALIGN, rn,
                                           alternate_base, ddc_base);
 
-    /* Compare address. We use unchecked TBI clean address for comparison. */
-    TCGv_i64 compare_addr = clean_data_tbi(s, cpu_reg_sp(s, rn));
-    tcg_gen_brcond_i64(TCG_COND_NE, compare_addr, cpu_exclusive_addr, fail_label);
+    /*
+     * Compare the checked address, which gen_load_exclusive recorded: with
+     * CCTLR.DDCBO it is relocated by DDC.base, so the raw register differs.
+     * The alignment check on the fail path uses it too (tmp).
+     */
+    tcg_gen_mov_i64(tmp, (TCGv_i64)clean_addr);
+    tcg_gen_brcond_i64(TCG_COND_NE, tmp, cpu_exclusive_addr, fail_label);
 
     if (is_pair) {
         if (size == 2) {
