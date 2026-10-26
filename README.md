@@ -1,11 +1,24 @@
-# CHERI-RISC-V QEMU 10.2 (WyattVO/cheri-qemu-port, branch `cheri-10.2`)
+# CHERI QEMU 10.2 (WyattVO/cheri-qemu-port, branch `cheri-10.2`)
 
-QEMU 10.2 with CHERI-RISC-V support, checked instruction by instruction against
-the Sail CHERI-RISC-V reference model with [TestRIG](https://github.com/WyattVO/TestRIG-cheri-qemu/tree/testrig-cheri-qemu-10.2)
-and at system level by booting CheriBSD.
-The port is RISC-V only. The upstream QEMU documentation is in
-[README.rst](README.rst), and the original CHERI-QEMU notes are in
-[README.CHERI.md](README.CHERI.md).
+QEMU 10.2 with CHERI support for RISC-V and Arm Morello.
+
+- **CHERI-RISC-V** is the main target. It is checked instruction by
+  instruction with [TestRIG](https://github.com/WyattVO/TestRIG-cheri-qemu/tree/testrig-cheri-qemu-10.2),
+  against the Sail CHERI-RISC-V reference model and CHERI-Alliance QEMU.
+  At system level it is checked by booting CheriBSD.
+- **Morello** builds and runs, but TestRIG does not test it (there is no
+  RVFI-DII or Sail model for Morello in TestRIG). It is tested only with the
+  bare-metal [morello-generated-tests](https://github.com/rems-project/morello-generated-tests),
+  which were generated from Arm's specification.
+
+The upstream QEMU documentation is in [README.rst](README.rst), and the
+original CHERI-QEMU notes are in [README.CHERI.md](README.CHERI.md).
+
+**AI use.** The changes in this branch were made with AI assistance (Claude).
+They were verified with the TestRIG gate rather than taken on trust: the
+branch at tag [`cheri-10.2-baseline-20261023`](https://github.com/WyattVO/cheri-qemu-port/tree/cheri-10.2-baseline-20261023)
+passes every stage of the gate and every Morello test. Each CHERI-RISC-V bug
+fix also has a regression trace or a bare-metal test that fails without it.
 
 ## Where this comes from
 
@@ -25,19 +38,28 @@ Branches in this fork:
 
 ## What it does now
 
-- Builds two CHERI-RISC-V system emulators:
+- Builds three CHERI system emulators. Two are CHERI-RISC-V:
   - `qemu-system-riscv64xcheri`: CHERI ISA v9 (Xcheri), which is what CheriBSD,
     the Sail model and TestRIG use.
   - `qemu-system-riscv64cheristd`: the draft RISC-V CHERI standard 0.9.3. It
     builds and starts, but nothing tests it yet, because TestRIG has no
     generator for 0.9.3.
+
+  The third is Morello:
+  - `qemu-system-morello`: Arm Morello. It passes 3393 of the
+    morello-generated-tests; the harness skips the other 2. That is the
+    same as the 7.1 baseline. It has no TestRIG or CheriBSD testing.
 - Boots CheriBSD (riscv64-purecap). `cheribsdtest-purecap` passes 305 tests with
   10 expected failures, and `cheribsdtest-hybrid` passes 149 with 52, which is
   the same as the 7.1 baseline.
 - Supports TestRIG (RVFI-DII) mode when built with `--enable-rvfi-dii`.
-- Matches the Sail CHERI-RISC-V v9 model on all 36 comparable QuickCheckVEngine
-  templates (300 random tests each), on 28 saved regression traces and on 6
-  bare-metal tests for features Sail does not model.
+- Matches the Sail CHERI-RISC-V v9 model on all 39 QuickCheckVEngine templates
+  of the gate (100 random tests each) and on 31 saved regression traces. It
+  also passes 32 bare-metal tests for features Sail does not model.
+- Passes upstream QEMU v10.2.0's own RISC-V check-tcg tests and qtests, and
+  gives the same riscv-arch-test 3.9.1 signatures as upstream. The only
+  exceptions are expected: 2 Zacas tests that hit an upstream bug, and
+  `bios-tables-test`, which needs a profile CHERI v9 can't offer.
 - Refuses CPU extensions that would bypass capability checks (see below).
 
 ### Extensions disabled on CHERI CPUs
@@ -66,8 +88,10 @@ Svpbmt/Svnapot, whose PTE bits are CHERI bits.
 
 ## Changes in this branch (Wyatt Voigt)
 
-Every bug fix below has a TestRIG regression trace or a bare-metal test in the
-TestRIG fork (`regressions/`), so it can't come back unnoticed.
+Every CHERI-RISC-V fix below has a TestRIG regression trace or a bare-metal
+test in the TestRIG fork (`regressions/`), so it can't come back unnoticed.
+The upstream qtests in the gate's stage 6 cover the other RISC-V fixes, and
+the morello-generated-tests cover the Morello fixes.
 
 **TestRIG (RVFI-DII) mode on QEMU 10.2**
 
@@ -126,6 +150,21 @@ TestRIG fork (`regressions/`), so it can't come back unnoticed.
   data-store one (a regression from the 10.x TLB rework).
 - `mseccfg.PMM` was writable without Smmpm when Smepmp is enabled (upstream
   QEMU bug; pointer masking itself stayed off).
+- `2bf17aa9cd` Implement `fpclear`, which was missing.
+- `ea51e31ba3` `amocas` with rd = x0 wrote to x0 (an upstream QEMU bug).
+
+**Other RISC-V fixes**
+
+- `cfdb9a165f` `cheri_tag_init` aborted under non-TCG accelerators, such as
+  qtest.
+- `385c7df638` The hobgoblin boards could not start on 10.2.
+
+**Morello** (tested with the morello-generated-tests, not TestRIG)
+
+- `bdb1dd967a` `get_phys_addr_pmsav7_default` gave the wrong protection type
+  for `CPUTLBEntryFull` (broken by the CHERI TLB flag fix `2d5d3f492b`).
+- `da1a391963` Store-exclusive used the raw address instead of the checked,
+  DDC-relocated one.
 
 ### Known differences from the Sail model
 
@@ -160,6 +199,14 @@ ninja
   `build/qemu-system-riscv64cheristd`.
 - Alternatively, cheribuild (`./cheribuild.py qemu`) builds QEMU together with
   the rest of the CHERI SDK.
+
+For Morello, use a separate build directory:
+
+```sh
+mkdir build-morello && cd build-morello
+../configure --target-list=morello-softmmu --disable-werror --disable-docs
+ninja
+```
 
 ## Running
 
@@ -202,11 +249,30 @@ template and, optionally, CheriBSD. See
 for setup, then:
 
 ```sh
-CHERIBSD_OUTPUT=~/cheri/output utils/scripts/testrig-gate.sh /path/to/build/qemu-system-riscv64xcheri 300
+CHERIBSD_OUTPUT=~/cheri/output utils/scripts/testrig-gate.sh /path/to/build/qemu-system-riscv64xcheri 100
 ```
 
 It must end with `TESTRIG GATE: PASS`. Run it after every change to this
-branch.
+branch. The fork's `docker/` directory builds a container with this branch
+and every reference the gate uses.
+
+### Test Morello
+
+TestRIG doesn't cover Morello. Instead, run the bare-metal
+[morello-generated-tests](https://github.com/rems-project/morello-generated-tests)
+with the pytest harness in `tests/morello`. It needs `pytest-xdist`.
+
+```sh
+git clone https://github.com/rems-project/morello-generated-tests.git
+cd tests/morello
+python3 -m pytest --numprocesses=$(nproc) \
+    --morello-tests-dir=/path/to/morello-generated-tests \
+    --qemu=/path/to/build-morello/qemu-system-morello
+```
+
+Expect `3393 passed, 2 skipped`. Run it after changes to shared code
+(`accel/tcg`, `target/cheri-common`, `include/`) as well as `target/arm`:
+a RISC-V fix once broke the Morello build.
 
 ## Not done yet
 
@@ -216,6 +282,8 @@ branch.
   TCG, is safe; use it for `-smp`.
 
 - Rebasing onto QEMU 11.
+- Instruction-level testing of Morello (TestRIG has no Morello model), and
+  booting CheriBSD for Morello.
 - Making vector CHERI-aware, which is needed before it can be enabled.
 - Testing `riscv64cheristd`: it needs CheriBSD for `riscv64zcheri093-purecap`
   and a Sail model of the 0.9.3 standard
