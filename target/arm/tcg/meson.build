@@ -46,6 +46,8 @@ arm_ss.add(files(
   'arith_helper.c',
   'vfp_helper.c',
   'cpregs-at.c',
+  'debug.c',
+  'psci.c',
 ))
 
 arm_ss.add(when: 'TARGET_AARCH64', if_true: files(
@@ -59,11 +61,10 @@ arm_ss.add(when: 'TARGET_AARCH64', if_true: files(
   'pauth_helper.c',
   'sme_helper.c',
   'sve_helper.c',
+  'vec_helper64.c',
 ))
 
-arm_system_ss.add(files(
-  'psci.c',
-))
-
+# CHERI: every file including target/arm/cpu.h is built per target, since
+# TARGET_CHERI changes CPUARMState (see the comment in target/arm/meson.build).
 arm_system_ss.add(when: 'CONFIG_ARM_V7M', if_true: files('cpu-v7m.c'))
 arm_user_ss.add(when: 'TARGET_AARCH64', if_false: files('cpu-v7m.c'))

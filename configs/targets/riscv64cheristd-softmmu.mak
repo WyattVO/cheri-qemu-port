@@ -4,7 +4,7 @@ INCLUDE_WORKAROUND=riscv64-softmmu.mak
 # CHERI-specific settings:
 #
 # Same as riscv64-softmmu.mak but with the extra riscv-64bit-cheri.xml
-TARGET_XML_FILES= gdb-xml/riscv-64bit-cpu.xml gdb-xml/riscv-32bit-fpu.xml gdb-xml/riscv-64bit-fpu.xml gdb-xml/riscv-64bit-virtual.xml gdb-xml/riscv-64bit-cheri.xml
+TARGET_XML_FILES= riscv-64bit-cpu.xml riscv-32bit-fpu.xml riscv-64bit-fpu.xml riscv-64bit-virtual.xml riscv-64bit-cheri.xml
 TARGET_CHERI=y
 TARGET_CHERI_RISCV_STD=y
 TARGET_CHERI_RISCV_STD_093=y

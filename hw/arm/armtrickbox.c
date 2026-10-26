@@ -34,12 +34,12 @@
  */
 
 #include "qemu/osdep.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "hw/arm/armtrickbox.h"
 #include "qemu/module.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #include "qemu/qemu-print.h"
 
 #define BUF_SIZE 100

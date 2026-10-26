@@ -35,6 +35,9 @@
 #ifdef TARGET_CHERI
 #include "cheri-helper-utils.h"
 #include "cheri_tagmem.h"
+#ifndef CONFIG_USER_ONLY
+#include "system/ramblock.h"
+#endif
 #endif
 
 #ifndef CONFIG_USER_ONLY

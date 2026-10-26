@@ -22,7 +22,7 @@
 #define HW_CMU_H
 
 #include "qom/object.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 
 // Version Register Fields for V2 Regmap
 #define CMU_VENDOR_ID 0x503l // Codasip

@@ -21,6 +21,8 @@
     VMSTATE_UINT64_V(_f, _s, _v)
 #define VMSTATE_UINTTL_ARRAY_V(_f, _s, _n, _v)                        \
     VMSTATE_UINT64_ARRAY_V(_f, _s, _n, _v)
+#define VMSTATE_UINTTL_SUB_ARRAY(_f, _s, _start, _num)                \
+    VMSTATE_UINT64_SUB_ARRAY(_f, _s, _start, _num)
 #define VMSTATE_UINTTL_2DARRAY_V(_f, _s, _n1, _n2, _v)                \
     VMSTATE_UINT64_2DARRAY_V(_f, _s, _n1, _n2, _v)
 #define VMSTATE_UINTTL_TEST(_f, _s, _t)                               \
@@ -40,6 +42,8 @@
     VMSTATE_UINT32_V(_f, _s, _v)
 #define VMSTATE_UINTTL_ARRAY_V(_f, _s, _n, _v)                        \
     VMSTATE_UINT32_ARRAY_V(_f, _s, _n, _v)
+#define VMSTATE_UINTTL_SUB_ARRAY(_f, _s, _start, _num)                \
+    VMSTATE_UINT32_SUB_ARRAY(_f, _s, _start, _num)
 #define VMSTATE_UINTTL_2DARRAY_V(_f, _s, _n1, _n2, _v)                \
     VMSTATE_UINT32_2DARRAY_V(_f, _s, _n1, _n2, _v)
 #define VMSTATE_UINTTL_TEST(_f, _s, _t)                               \
@@ -70,8 +74,10 @@
     VMSTATE_ALIGN_CAP_ARRAY_V(_f, _s, _n, 0)
 
 #define VMSTATE_UINTTL_OR_CAP(_f, _cf, _s) VMSTATE_CAP(_cf, _s)
+#define VMSTATE_UINT64_OR_CAP(_f, _cf, _s) VMSTATE_CAP(_cf, _s)
 #else
 #define VMSTATE_UINTTL_OR_CAP(_f, _cf, _s) VMSTATE_UINTTL(_f, _s)
+#define VMSTATE_UINT64_OR_CAP(_f, _cf, _s) VMSTATE_UINT64(_f, _s)
 #endif
 
 #endif

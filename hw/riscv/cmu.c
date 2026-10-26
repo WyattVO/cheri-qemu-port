@@ -21,11 +21,12 @@
 #include <math.h>
 #include "qemu/osdep.h"
 #include "hw/riscv/cmu.h"
+#include "system/ramblock.h"
 #include "qemu/osdep.h"
 #include "qapi/error.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
-#include "hw/qdev-properties.h"
+#include "hw/core/qdev-properties.h"
 #ifdef TARGET_CHERI
 #include "cheri_tagmem.h"
 #endif

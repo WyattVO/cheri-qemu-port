@@ -13,7 +13,7 @@
 
 #include "target/arm/cpu-qom.h"
 #include "qemu/notify.h"
-#include "hw/loader.h"
+#include "hw/core/loader.h"
 
 typedef enum {
     ARM_ENDIANNESS_UNKNOWN = 0,

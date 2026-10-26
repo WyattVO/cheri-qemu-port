@@ -140,6 +140,8 @@ sw                110  ... ... .. ... 00 @cs_w
   # RV32C
   lc              011  ... ... .. ... 00 @cl_d ?pred_capmode
   c_flw             011  ... ... .. ... 00 @cl_w ?!pred_capmode
+  # *** Zclsd Extension *** (integer mode only; in capmode this is lc)
+  zclsd_ld        011  ... ... .. ... 00 @cl_d ?!pred_capmode
 }
 {
   sq              101  ... ... .. ... 00 @cs_q ?!pred_rv64_capmode
@@ -152,6 +154,8 @@ sw                110  ... ... .. ... 00 @cs_w
   # RV32C
   sc              111  ... ... .. ... 00 @cs_d ?pred_capmode
   c_fsw           111  ... ... .. ... 00 @cs_w ?!pred_capmode
+  # *** Zclsd Extension *** (integer mode only; in capmode this is sc)
+  zclsd_sd        111  ... ... .. ... 00 @cs_d ?!pred_capmode
 }
 
 # *** RV32/64C Standard Extension (Quadrant 1) ***
@@ -236,6 +240,8 @@ sw                110 .  .....  ..... 10 @c_swsp
   c_flw           011 .  .....  ..... 10 @c_lwsp ?!pred_capmode
   illegal         011 -  00000  ----- 10         ?pred_capmode # RES rd=0
   lc              011 .  .....  ..... 10 @c_ldsp ?pred_capmode
+  # *** Zclsd Extension *** (integer mode only; in capmode this is lc)
+  zclsd_ldsp      011 .  .....  ..... 10 @c_ldsp ?!pred_capmode
 }
 {
   cm_push         101  11000  .... .. 10 @cm_pp ?pred_zcmp_and_not_capmode
@@ -257,6 +263,8 @@ sw                110 .  .....  ..... 10 @c_swsp
   # RV32C
   c_fsw           111 .  .....  ..... 10 @c_swsp ?!pred_capmode
   sc              111 .  .....  ..... 10 @c_sdsp ?pred_capmode
+  # *** Zclsd Extension *** (integer mode only; in capmode this is sc)
+  zclsd_sd        111 .  .....  ..... 10 @c_sdsp ?!pred_capmode
 }
 
 # *** RV64 and RV32 Zcb Extension ***

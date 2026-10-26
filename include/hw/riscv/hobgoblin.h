@@ -21,7 +21,7 @@
 #define HW_RISCV_HOBGOBLIN_H
 
 #include "hw/riscv/riscv_hart.h"
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 
 #define TYPE_HOBGOBLIN_MACHINE               MACHINE_TYPE_NAME("hobgoblin")
 #define TYPE_HOBGOBLIN_GENESYS2V1_MACHINE    MACHINE_TYPE_NAME("hobgoblin-genesys2")

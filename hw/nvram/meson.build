@@ -19,7 +19,7 @@ system_ss.add(when: 'CONFIG_XLNX_BBRAM', if_true: files('xlnx-bbram.c'))
 
 specific_ss.add(when: 'CONFIG_PSERIES', if_true: files('spapr_nvram.c'))
 specific_ss.add(when: 'CONFIG_HOBGOBLIN_NVEMU', if_true: files('hobgoblin_nvemu.c'))
-specific_ss.add(when: 'CONFIG_ACPI', if_true: files('fw_cfg-acpi.c'))
+system_ss.add(when: 'CONFIG_ACPI', if_true: files('fw_cfg-acpi.c'))
 
 system_ss.add(when: 'CONFIG_ASPEED_SOC', if_true: files(
   'aspeed_otp.c',

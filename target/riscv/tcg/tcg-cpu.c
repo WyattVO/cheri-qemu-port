@@ -39,7 +39,7 @@
 #include "accel/tcg/cpu-ops.h"
 #include "tcg/tcg.h"
 #ifndef CONFIG_USER_ONLY
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "system/tcg.h"
 #include "exec/icount.h"
 #endif
@@ -514,7 +514,7 @@ static void riscv_cpu_disable_priv_spec_isa_exts(RISCVCPU *cpu)
                 continue;
             }
 #ifndef CONFIG_USER_ONLY
-            warn_report("disabling %s extension for hart 0x" TARGET_FMT_lx
+            warn_report("disabling %s extension for hart 0x%" PRIx64
                         " because privilege spec version does not match",
                         edata->name, env->mhartid);
 #else
@@ -888,6 +888,19 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu->pmu_avail_ctrs = 0;
     }
 
+    if (cpu->cfg.ext_zclsd) {
+        if (riscv_has_ext(env, RVC) && riscv_has_ext(env, RVF)) {
+            error_setg(errp,
+                    "Zclsd cannot be supported together with C and F extension");
+            return;
+        }
+        if (cpu->cfg.ext_zcf) {
+            error_setg(errp,
+                    "Zclsd cannot be supported together with Zcf extension");
+            return;
+        }
+    }
+
     if (cpu->cfg.ext_zicfilp && !cpu->cfg.ext_zicsr) {
         error_setg(errp, "zicfilp extension requires zicsr extension");
         return;
@@ -1151,6 +1164,20 @@ static void cpu_enable_zc_implied_rules(RISCVCPU *cpu)
     }
 }
 
+static void cpu_enable_zilsd_implied_rules(RISCVCPU *cpu)
+{
+    CPURISCVState *env = &cpu->env;
+
+    if (cpu->cfg.ext_zilsd && riscv_has_ext(env, RVC)) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zclsd), true);
+    }
+
+    if (cpu->cfg.ext_zclsd) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zca), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zilsd), true);
+    }
+}
+
 static void riscv_cpu_enable_implied_rules(RISCVCPU *cpu)
 {
     RISCVCPUImpliedExtsRule *rule;
@@ -1158,6 +1185,9 @@ static void riscv_cpu_enable_implied_rules(RISCVCPU *cpu)
 
     /* Enable the implied extensions for Zc. */
     cpu_enable_zc_implied_rules(cpu);
+
+    /* Enable the implied extensions for Zilsd. */
+    cpu_enable_zilsd_implied_rules(cpu);
 
     /* Enable the implied MISAs. */
     for (i = 0; (rule = riscv_misa_ext_implied_rules[i]); i++) {
@@ -1800,6 +1830,9 @@ static void riscv_init_max_cpu_extensions(Object *obj)
     isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_zce), false);
     isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_zcmp), false);
     isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_zcmt), false);
+
+    isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_zilsd), false);
+    isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_zclsd), false);
 
     if (env->misa_mxl != MXL_RV32) {
         isa_ext_update_enabled(cpu, CPU_CFG_OFFSET(ext_zcf), false);

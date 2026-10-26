@@ -35,8 +35,8 @@
 #include "system/kvm.h"
 #include "system/qtest.h"
 #include "exec/gdbstub.h"
-#include "hw/qdev-properties.h"
-#include "hw/qdev-clock.h"
+#include "hw/core/qdev-properties.h"
+#include "hw/core/qdev-clock.h"
 #include "fpu_helper.h"
 #ifndef CONFIG_USER_ONLY
 #include "semihosting/semihost.h"
@@ -513,9 +513,12 @@ static void mips_cpu_reset_hold(Object *obj, ResetType type)
 #endif
 }
 
-static void mips_cpu_disas_set_info(CPUState *s, disassemble_info *info)
+static void mips_cpu_disas_set_info(const CPUState *cs, disassemble_info *info)
 {
-    if (!(cpu_env(s)->insn_flags & ISA_NANOMIPS32)) {
+    const MIPSCPU *cpu = MIPS_CPU(cs);
+    const CPUMIPSState *env = &cpu->env;
+
+    if (!(env->insn_flags & ISA_NANOMIPS32)) {
         info->endian = TARGET_BIG_ENDIAN ? BFD_ENDIAN_BIG
                                          : BFD_ENDIAN_LITTLE;
         info->print_insn = TARGET_BIG_ENDIAN ? print_insn_big_mips
@@ -554,6 +557,14 @@ static void mips_cpu_realizefn(DeviceState *dev, Error **errp)
     MIPSCPUClass *mcc = MIPS_CPU_GET_CLASS(dev);
     Error *local_err = NULL;
 
+#ifndef CONFIG_USER_ONLY
+    if (mcc->cpu_def->lcsr_cpucfg2 & (1 << CPUCFG2_LCSRP)) {
+        memory_region_init_io(&env->iocsr.mr, OBJECT(cpu), NULL,
+                              env, "iocsr", UINT64_MAX);
+        address_space_init(&env->iocsr.as, &env->iocsr.mr, "IOCSR");
+    }
+#endif
+
     if (!clock_get(cpu->clock)) {
 #ifndef CONFIG_USER_ONLY
         if (!qtest_enabled()) {
@@ -576,23 +587,23 @@ static void mips_cpu_realizefn(DeviceState *dev, Error **errp)
 
 #ifdef TARGET_MIPS64
     gdb_register_coprocessor(cs, NULL, NULL,
-                             gdb_find_static_feature("mips64-cp0.xml"), 0);
+                             gdb_find_static_feature("mips64-cp0.xml"));
     gdb_register_coprocessor(cs, NULL, NULL,
-                             gdb_find_static_feature("mips64-fpu.xml"), 0);
+                             gdb_find_static_feature("mips64-fpu.xml"));
     gdb_register_coprocessor(cs, mips_gdb_get_sys_reg, mips_gdb_set_sys_reg,
-                             gdb_find_static_feature("mips64-sys.xml"), 0);
+                             gdb_find_static_feature("mips64-sys.xml"));
 #if defined(TARGET_CHERI)
     gdb_register_coprocessor(cs, mips_gdb_get_cheri_reg,
                              mips_gdb_set_cheri_reg,
-                             gdb_find_static_feature("mips64-cheri-c128.xml"), 0);
+                             gdb_find_static_feature("mips64-cheri-c128.xml"));
 #endif
 #else
     gdb_register_coprocessor(cs, NULL, NULL,
-                             gdb_find_static_feature("mips-cp0.xml"), 0);
+                             gdb_find_static_feature("mips-cp0.xml"));
     gdb_register_coprocessor(cs, NULL, NULL,
-                             gdb_find_static_feature("mips-fpu.xml"), 0);
+                             gdb_find_static_feature("mips-fpu.xml"));
     gdb_register_coprocessor(cs, mips_gdb_get_sys_reg, mips_gdb_set_sys_reg,
-                             gdb_find_static_feature("mips-sys.xml"), 0);
+                             gdb_find_static_feature("mips-sys.xml"));
 #endif
 
     env->exception_base = (int32_t)0xBFC00000;
@@ -619,14 +630,6 @@ static void mips_cpu_initfn(Object *obj)
     cpu->count_div = clock_new(OBJECT(obj), "clk-div-count");
     env->count_clock = clock_new(OBJECT(obj), "clk-count");
     env->cpu_model = mcc->cpu_def;
-#ifndef CONFIG_USER_ONLY
-    if (mcc->cpu_def->lcsr_cpucfg2 & (1 << CPUCFG2_LCSRP)) {
-        memory_region_init_io(&env->iocsr.mr, OBJECT(cpu), NULL,
-                                env, "iocsr", UINT64_MAX);
-        address_space_init(&env->iocsr.as,
-                            &env->iocsr.mr, "IOCSR");
-    }
-#endif
 }
 
 static char *mips_cpu_type_name(const char *cpu_model)

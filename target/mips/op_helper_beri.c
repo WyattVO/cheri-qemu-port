@@ -40,7 +40,7 @@
 #include "cpu.h"
 #include "internal.h"
 #ifndef CONFIG_USER_ONLY
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #endif
 
 uint64_t helper_mfc0_rtc64(CPUMIPSState *env)

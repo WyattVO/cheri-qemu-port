@@ -6,6 +6,7 @@ gen_nocheri = [
   decodetree.process('insn32.decode', extra_args: [dir / 'insn32-rv128.decode', '--static-decode=decode_insn32']),
   decodetree.process('xthead.decode', extra_args: '--static-decode=decode_xthead'),
   decodetree.process('XVentanaCondOps.decode', extra_args: '--static-decode=decode_XVentanaCodeOps'),
+  decodetree.process('xmips.decode', extra_args: '--static-decode=decode_xmips'),
 ]
 
 # FIXME: would be nice to avoid this duplication but I don't see an easy way to
@@ -28,18 +29,21 @@ gen_xcheri32 = [
   decodetree_w_cheri_deps.process('insn32.decode', extra_args: [dir / 'insn32-cheri-v9.decode', dir / 'insn32-cheri-v9-32.decode', '--static-decode=decode_insn32']),
   decodetree.process('xthead.decode', extra_args: '--static-decode=decode_xthead'),
   decodetree.process('XVentanaCondOps.decode', extra_args: '--static-decode=decode_XVentanaCodeOps'),
+  decodetree.process('xmips.decode', extra_args: '--static-decode=decode_xmips'),
 ]
 gen_xcheri64 = [
   decodetree.process('insn16.decode', extra_args: ['--static-decode=decode_insn16', '--insnwidth=16']),
   decodetree_w_cheri_deps.process('insn32.decode', extra_args: [dir / 'insn32-cheri-v9.decode', dir / 'insn32-cheri-v9-64.decode', '--static-decode=decode_insn32']),
   decodetree.process('xthead.decode', extra_args: '--static-decode=decode_xthead'),
   decodetree.process('XVentanaCondOps.decode', extra_args: '--static-decode=decode_XVentanaCodeOps'),
+  decodetree.process('xmips.decode', extra_args: '--static-decode=decode_xmips'),
 ]
 gen_stdcheri = [
   decodetree.process('insn16.decode', extra_args: ['--static-decode=decode_insn16', '--insnwidth=16']),
   decodetree_w_cheri_deps.process('insn32.decode', extra_args: [dir / 'insn32-cheri-std.decode', '--static-decode=decode_insn32']),
   decodetree.process('xthead.decode', extra_args: '--static-decode=decode_xthead'),
   decodetree.process('XVentanaCondOps.decode', extra_args: '--static-decode=decode_XVentanaCodeOps'),
+  decodetree.process('xmips.decode', extra_args: '--static-decode=decode_xmips'),
 ]
 
 cheri_ss = ss.source_set()
@@ -80,6 +84,7 @@ riscv_system_ss.add(files(
   'debug.c',
   'monitor.c',
   'machine.c',
+  'mips_csr.c',
   'pmu.c',
   'th_csr.c',
   'time_helper.c',

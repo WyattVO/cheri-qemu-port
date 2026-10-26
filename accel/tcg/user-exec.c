@@ -648,7 +648,7 @@ void tb_lock_page0(tb_page_addr_t address)
 
     if (prot & PAGE_WRITE) {
         pageflags_set_clear(start, last, 0, PAGE_WRITE);
-        mprotect(g2h_untagged(start), last - start + 1,
+        mprotect(g2h_untagged_vaddr(start), last - start + 1,
                  prot & (PAGE_READ | PAGE_EXEC) ? PROT_READ : PROT_NONE);
     }
 }
@@ -735,7 +735,7 @@ int page_unprotect(CPUState *cpu, tb_page_addr_t address, uintptr_t pc)
         if (prot & PAGE_EXEC) {
             prot = (prot & ~PAGE_EXEC) | PAGE_READ;
         }
-        mprotect((void *)g2h_untagged(start), len, prot & PAGE_RWX);
+        mprotect((void *)g2h_untagged_vaddr(start), len, prot & PAGE_RWX);
     }
     mmap_unlock();
 
@@ -764,7 +764,7 @@ probe_access_internal(CPUArchState *env, vaddr addr, int fault_size,
         g_assert_not_reached();
     }
 
-    if (guest_addr_valid_untagged(addr)) {
+    if (guest_addr_valid_untagged_vaddr(addr)) {
         int page_flags = page_get_flags(addr);
         if (page_flags & acc_flag) {
             if (access_type != MMU_INST_FETCH
@@ -793,7 +793,7 @@ int probe_access_flags(CPUArchState *env, vaddr addr, int size,
 
     g_assert(-(addr | TARGET_PAGE_MASK) >= size);
     flags = probe_access_internal(env, addr, size, access_type, nonfault, ra);
-    *phost = (flags & TLB_INVALID_MASK) ? NULL : g2h(env_cpu(env), addr);
+    *phost = (flags & TLB_INVALID_MASK) ? NULL : g2h_vaddr(env_cpu(env), addr);
     return flags;
 }
 
@@ -807,7 +807,7 @@ probe_access_inlined(CPUArchState *env, vaddr addr, int size,
     flags = probe_access_internal(env, addr, size, access_type, false, ra);
     g_assert((flags & ~TLB_MMIO) == 0);
 
-    return size ? g2h(env_cpu(env), addr) : NULL;
+    return size ? g2h_vaddr(env_cpu(env), addr) : NULL;
 }
 
 #include "probe-access.inc.c"
@@ -815,7 +815,7 @@ probe_access_inlined(CPUArchState *env, vaddr addr, int size,
 void *tlb_vaddr_to_host(CPUArchState *env, vaddr addr,
                         MMUAccessType access_type, int mmu_idx)
 {
-    return g2h(env_cpu(env), addr);
+    return g2h_vaddr(env_cpu(env), addr);
 }
 
 tb_page_addr_t get_page_addr_code_hostp(CPUArchState *env, vaddr addr,
@@ -826,9 +826,7 @@ tb_page_addr_t get_page_addr_code_hostp(CPUArchState *env, vaddr addr,
     flags = probe_access_internal(env, addr, 1, MMU_INST_FETCH, false, 0);
     g_assert(flags == 0);
 
-    if (hostp) {
-        *hostp = g2h_untagged(addr);
-    }
+    *hostp = g2h_untagged_vaddr(addr);
     return addr;
 }
 
@@ -944,7 +942,7 @@ static void *cpu_mmu_lookup(CPUState *cpu, vaddr addr,
         cpu_loop_exit_sigbus(cpu, addr, type, ra);
     }
 
-    ret = g2h(cpu, addr);
+    ret = g2h_vaddr(cpu, addr);
     set_helper_retaddr(ra);
     return ret;
 }
@@ -974,7 +972,7 @@ int cpu_memory_rw_debug(CPUState *cpu, vaddr addr,
         }
         if (is_write) {
             if (flags & PAGE_WRITE) {
-                memcpy(g2h(cpu, addr), buf, l);
+                memcpy(g2h_vaddr(cpu, addr), buf, l);
             } else {
                 /* Bypass the host page protection using ptrace. */
                 if (fd == -1) {
@@ -993,13 +991,13 @@ int cpu_memory_rw_debug(CPUState *cpu, vaddr addr,
                  */
                 tb_invalidate_phys_range(NULL, addr, addr + l - 1);
                 written = pwrite(fd, buf, l,
-                                 (off_t)(uintptr_t)g2h_untagged(addr));
+                                 (off_t)(uintptr_t)g2h_untagged_vaddr(addr));
                 if (written != l) {
                     goto out_close;
                 }
             }
         } else if (flags & PAGE_READ) {
-            memcpy(buf, g2h(cpu, addr), l);
+            memcpy(buf, g2h_vaddr(cpu, addr), l);
         } else {
             /* Bypass the host page protection using ptrace. */
             if (fd == -1) {
@@ -1009,7 +1007,7 @@ int cpu_memory_rw_debug(CPUState *cpu, vaddr addr,
                 }
             }
             if (pread(fd, buf, l,
-                      (off_t)(uintptr_t)g2h_untagged(addr)) != l) {
+                      (off_t)(uintptr_t)g2h_untagged_vaddr(addr)) != l) {
                 goto out_close;
             }
         }
@@ -1237,7 +1235,7 @@ static void *atomic_mmu_lookup(CPUState *cpu, vaddr addr, MemOpIdx oi,
         cpu_loop_exit_atomic(cpu, retaddr);
     }
 
-    ret = g2h(cpu, addr);
+    ret = g2h_vaddr(cpu, addr);
     set_helper_retaddr(retaddr);
     return ret;
 }
@@ -1262,10 +1260,8 @@ static void *atomic_mmu_lookup(CPUState *cpu, vaddr addr, MemOpIdx oi,
 #define DATA_SIZE 4
 #include "atomic_template.h"
 
-#ifdef CONFIG_ATOMIC64
 #define DATA_SIZE 8
 #include "atomic_template.h"
-#endif
 
 #if defined(CONFIG_ATOMIC128) || HAVE_CMPXCHG128
 #define DATA_SIZE 16

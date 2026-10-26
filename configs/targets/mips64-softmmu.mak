@@ -1,5 +1,6 @@
 TARGET_ARCH=mips64
 TARGET_BASE_ARCH=mips
 TARGET_BIG_ENDIAN=y
-TARGET_XML_FILES=gdb-xml/mips64-cpu.xml gdb-xml/mips64-cp0.xml gdb-xml/mips64-fpu.xml gdb-xml/mips64-sys.xml
+TARGET_XML_FILES=mips64-cpu.xml mips64-cp0.xml mips64-fpu.xml mips64-sys.xml
 TARGET_LONG_BITS=64
+TARGET_NOT_USING_LEGACY_LDST_PHYS_API=y

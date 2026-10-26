@@ -10,7 +10,7 @@
 #ifndef CODASIP_TRNG_H
 #define CODASIP_TRNG_H
 
-#include "hw/sysbus.h"
+#include "hw/core/sysbus.h"
 #include "qom/object.h"
 
 #define TYPE_CODASIP_TRNG "codasip-trng"

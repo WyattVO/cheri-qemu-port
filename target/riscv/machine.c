@@ -80,17 +80,17 @@ static bool hyper_needed(void *opaque)
 
 static const VMStateDescription vmstate_hyper = {
     .name = "cpu/hyper",
-    .version_id = 4,
-    .minimum_version_id = 4,
+    .version_id = 5,
+    .minimum_version_id = 5,
     .needed = hyper_needed,
     .fields = (const VMStateField[]) {
-        VMSTATE_UINTTL(env.hstatus, RISCVCPU),
-        VMSTATE_UINTTL(env.hedeleg, RISCVCPU),
+        VMSTATE_UINT64(env.hstatus, RISCVCPU),
+        VMSTATE_UINT64(env.hedeleg, RISCVCPU),
         VMSTATE_UINT64(env.hideleg, RISCVCPU),
         VMSTATE_UINT32(env.hcounteren, RISCVCPU),
-        VMSTATE_UINTTL(env.htval, RISCVCPU),
-        VMSTATE_UINTTL(env.htinst, RISCVCPU),
-        VMSTATE_UINTTL(env.hgatp, RISCVCPU),
+        VMSTATE_UINT64(env.htval, RISCVCPU),
+        VMSTATE_UINT64(env.htinst, RISCVCPU),
+        VMSTATE_UINT64(env.hgatp, RISCVCPU),
         VMSTATE_UINTTL(env.hgeie, RISCVCPU),
         VMSTATE_UINTTL(env.hgeip, RISCVCPU),
         VMSTATE_UINT64(env.hvien, RISCVCPU),
@@ -98,32 +98,32 @@ static const VMStateDescription vmstate_hyper = {
         VMSTATE_UINT64(env.htimedelta, RISCVCPU),
         VMSTATE_UINT64(env.vstimecmp, RISCVCPU),
 
-        VMSTATE_UINTTL(env.hvictl, RISCVCPU),
+        VMSTATE_UINT32(env.hvictl, RISCVCPU),
         VMSTATE_UINT8_ARRAY(env.hviprio, RISCVCPU, 64),
 
         VMSTATE_UINT64(env.vsstatus, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.vstvec, env.vstvecc, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.vsscratch, env.vsscratchc, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.vsepc, env.vsepcc, RISCVCPU),
-        VMSTATE_UINTTL(env.vscause, RISCVCPU),
-        VMSTATE_UINTTL(env.vstval, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.vstvec, env.vstvecc, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.vsscratch, env.vsscratchc, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.vsepc, env.vsepcc, RISCVCPU),
+        VMSTATE_UINT64(env.vscause, RISCVCPU),
+        VMSTATE_UINT64(env.vstval, RISCVCPU),
 #ifdef TARGET_CHERI_RISCV_STD_093
         VMSTATE_UINTTL(env.vstval2, RISCVCPU),
         VMSTATE_UINTTL(env.stval2_hs, RISCVCPU),
 #endif
-        VMSTATE_UINTTL(env.vsatp, RISCVCPU),
+        VMSTATE_UINT64(env.vsatp, RISCVCPU),
         VMSTATE_UINTTL(env.vsiselect, RISCVCPU),
         VMSTATE_UINT64(env.vsie, RISCVCPU),
 
-        VMSTATE_UINTTL(env.mtval2, RISCVCPU),
-        VMSTATE_UINTTL(env.mtinst, RISCVCPU),
+        VMSTATE_UINT64(env.mtval2, RISCVCPU),
+        VMSTATE_UINT64(env.mtinst, RISCVCPU),
 
-        VMSTATE_UINTTL_OR_CAP(env.stvec_hs, env.stcc_hs, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.sscratch_hs, env.sscratchc_hs, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.sepc_hs, env.sepcc_hs, RISCVCPU),
-        VMSTATE_UINTTL(env.scause_hs, RISCVCPU),
-        VMSTATE_UINTTL(env.stval_hs, RISCVCPU),
-        VMSTATE_UINTTL(env.satp_hs, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.stvec_hs, env.stcc_hs, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.sscratch_hs, env.sscratchc_hs, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.sepc_hs, env.sepcc_hs, RISCVCPU),
+        VMSTATE_UINT64(env.scause_hs, RISCVCPU),
+        VMSTATE_UINT64(env.stval_hs, RISCVCPU),
+        VMSTATE_UINT64(env.satp_hs, RISCVCPU),
         VMSTATE_UINT64(env.mstatus_hs, RISCVCPU),
 
         VMSTATE_END_OF_LIST()
@@ -322,12 +322,12 @@ static bool envcfg_needed(void *opaque)
 
 static const VMStateDescription vmstate_envcfg = {
     .name = "cpu/envcfg",
-    .version_id = 1,
-    .minimum_version_id = 1,
+    .version_id = 2,
+    .minimum_version_id = 2,
     .needed = envcfg_needed,
     .fields = (const VMStateField[]) {
         VMSTATE_UINT64(env.menvcfg, RISCVCPU),
-        VMSTATE_UINTTL(env.senvcfg, RISCVCPU),
+        VMSTATE_UINT64(env.senvcfg, RISCVCPU),
         VMSTATE_UINT64(env.henvcfg, RISCVCPU),
         VMSTATE_END_OF_LIST()
     }
@@ -366,14 +366,12 @@ static bool pmu_needed(void *opaque)
 
 static const VMStateDescription vmstate_pmu_ctr_state = {
     .name = "cpu/pmu",
-    .version_id = 2,
-    .minimum_version_id = 2,
+    .version_id = 3,
+    .minimum_version_id = 3,
     .needed = pmu_needed,
     .fields = (const VMStateField[]) {
-        VMSTATE_UINTTL(mhpmcounter_val, PMUCTRState),
-        VMSTATE_UINTTL(mhpmcounterh_val, PMUCTRState),
-        VMSTATE_UINTTL(mhpmcounter_prev, PMUCTRState),
-        VMSTATE_UINTTL(mhpmcounterh_prev, PMUCTRState),
+        VMSTATE_UINT64(mhpmcounter_val, PMUCTRState),
+        VMSTATE_UINT64(mhpmcounter_prev, PMUCTRState),
         VMSTATE_END_OF_LIST()
     }
 };
@@ -387,11 +385,11 @@ static bool jvt_needed(void *opaque)
 
 static const VMStateDescription vmstate_jvt = {
     .name = "cpu/jvt",
-    .version_id = 1,
-    .minimum_version_id = 1,
+    .version_id = 2,
+    .minimum_version_id = 2,
     .needed = jvt_needed,
     .fields = (const VMStateField[]) {
-        VMSTATE_UINTTL(env.jvt, RISCVCPU),
+        VMSTATE_UINT64(env.jvt, RISCVCPU),
         VMSTATE_END_OF_LIST()
     }
 };
@@ -458,8 +456,8 @@ static const VMStateDescription vmstate_sstc = {
 
 const VMStateDescription vmstate_riscv_cpu = {
     .name = "cpu",
-    .version_id = 10,
-    .minimum_version_id = 10,
+    .version_id = 11,
+    .minimum_version_id = 11,
     .post_load = riscv_cpu_post_load,
     .fields = (const VMStateField[]) {
 #ifdef TARGET_CHERI
@@ -485,7 +483,7 @@ const VMStateDescription vmstate_riscv_cpu = {
         VMSTATE_UINTTL(env.priv, RISCVCPU),
         VMSTATE_BOOL(env.virt_enabled, RISCVCPU),
         VMSTATE_UINT64(env.resetvec, RISCVCPU),
-        VMSTATE_UINTTL(env.mhartid, RISCVCPU),
+        VMSTATE_UINT64(env.mhartid, RISCVCPU),
         VMSTATE_UINT64(env.mstatus, RISCVCPU),
         VMSTATE_UINT64(env.mip, RISCVCPU),
         VMSTATE_UINT64(env.miclaim, RISCVCPU),
@@ -494,19 +492,19 @@ const VMStateDescription vmstate_riscv_cpu = {
         VMSTATE_UINT64(env.mvip, RISCVCPU),
         VMSTATE_UINT64(env.sie, RISCVCPU),
         VMSTATE_UINT64(env.mideleg, RISCVCPU),
-        VMSTATE_UINTTL(env.satp, RISCVCPU),
-        VMSTATE_UINTTL(env.stval, RISCVCPU),
+        VMSTATE_UINT64(env.satp, RISCVCPU),
+        VMSTATE_UINT64(env.stval, RISCVCPU),
 #ifdef TARGET_CHERI_RISCV_STD_093
         VMSTATE_UINTTL(env.stval2, RISCVCPU),
 #endif
-        VMSTATE_UINTTL(env.medeleg, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.stvec, env.stvecc, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.sepc, env.sepcc, RISCVCPU),
-        VMSTATE_UINTTL(env.scause, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.mtvec, env.mtvecc, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.mepc, env.mepcc, RISCVCPU),
-        VMSTATE_UINTTL(env.mcause, RISCVCPU),
-        VMSTATE_UINTTL(env.mtval, RISCVCPU),
+        VMSTATE_UINT64(env.medeleg, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.stvec, env.stvecc, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.sepc, env.sepcc, RISCVCPU),
+        VMSTATE_UINT64(env.scause, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.mtvec, env.mtvecc, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.mepc, env.mepcc, RISCVCPU),
+        VMSTATE_UINT64(env.mcause, RISCVCPU),
+        VMSTATE_UINT64(env.mtval, RISCVCPU),
         VMSTATE_UINTTL(env.miselect, RISCVCPU),
         VMSTATE_UINTTL(env.siselect, RISCVCPU),
         VMSTATE_UINT32(env.scounteren, RISCVCPU),
@@ -515,10 +513,9 @@ const VMStateDescription vmstate_riscv_cpu = {
         VMSTATE_UINT32(env.mcountinhibit, RISCVCPU),
         VMSTATE_STRUCT_ARRAY(env.pmu_ctrs, RISCVCPU, RV_MAX_MHPMCOUNTERS, 0,
                              vmstate_pmu_ctr_state, PMUCTRState),
-        VMSTATE_UINTTL_ARRAY(env.mhpmevent_val, RISCVCPU, RV_MAX_MHPMEVENTS),
-        VMSTATE_UINTTL_ARRAY(env.mhpmeventh_val, RISCVCPU, RV_MAX_MHPMEVENTS),
-        VMSTATE_UINTTL_OR_CAP(env.sscratch, env.sscratchc, RISCVCPU),
-        VMSTATE_UINTTL_OR_CAP(env.mscratch, env.mscratchc, RISCVCPU),
+        VMSTATE_UINT64_ARRAY(env.mhpmevent_val, RISCVCPU, RV_MAX_MHPMEVENTS),
+        VMSTATE_UINT64_OR_CAP(env.sscratch, env.sscratchc, RISCVCPU),
+        VMSTATE_UINT64_OR_CAP(env.mscratch, env.mscratchc, RISCVCPU),
         VMSTATE_UINT64(env.mfromhost, RISCVCPU),
         VMSTATE_UINT64(env.mtohost, RISCVCPU),
         VMSTATE_UINT64(env.stimecmp, RISCVCPU),

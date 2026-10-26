@@ -21,7 +21,8 @@
 #include "qemu/units.h"
 #include "cpu.h"
 #include "gdbstub/helpers.h"
-#include "exec/helper-proto.h"
+#include "helper.h"
+#include "helper-a64.h"
 #include "qemu/host-utils.h"
 #include "qemu/log.h"
 #include "qemu/main-loop.h"
@@ -71,6 +72,9 @@ static inline void set_xreg_addr_cheri(CPUARMState *env, int reg, uint64_t addr)
 #include "user/page-protection.h"
 #endif
 #include "vec_internal.h"
+
+#define HELPER_H "tcg/helper-a64-defs.h"
+#include "exec/helper-info.c.inc"
 
 /* C2.4.7 Multiply and divide */
 /* special cases for 0 and LLONG_MIN are mandated by the standard */
@@ -861,7 +865,7 @@ void HELPER(dc_zva)(CPUARMState *env, target_ulong vaddr_in)
      * (which matches the usual QEMU behaviour of not implementing either
      * alignment faults or any memory attribute handling).
      */
-    int blocklen = 4 << env_archcpu(env)->dcz_blocksize;
+    int blocklen = 4 << get_dczid_bs(env_archcpu(env));
     uint64_t vaddr = vaddr_in & ~(blocklen - 1);
     int mmu_idx = arm_env_mmu_index(env);
     void *mem;

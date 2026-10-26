@@ -1,4 +1,5 @@
 TARGET_ARCH=mips
 TARGET_BIG_ENDIAN=y
-TARGET_XML_FILES=gdb-xml/mips-cpu.xml gdb-xml/mips-cp0.xml gdb-xml/mips-fpu.xml gdb-xml/mips-sys.xml
+TARGET_XML_FILES=mips-cpu.xml mips-cp0.xml mips-fpu.xml mips-sys.xml
 TARGET_LONG_BITS=32
+TARGET_NOT_USING_LEGACY_LDST_PHYS_API=y
