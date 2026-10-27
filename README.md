@@ -3,10 +3,10 @@
 QEMU 11.0 with CHERI support for RISC-V and Arm Morello. This branch is the
 CHERI QEMU 10.2 port (branch `cheri-10.2`) merged with upstream QEMU v11.0.0.
 
-> **Work in progress.** The 11.0 port builds, but it has not passed the full
-> TestRIG gate yet. Use `cheri-10.2` for anything that needs a verified
-> emulator. [Status of the 11.0 port](#status-of-the-110-port) lists what
-> has been checked so far.
+> **Not yet tagged.** The 11.0 port passes every stage of the TestRIG gate
+> and every Morello test, but it has no baseline tag yet.
+> `cheri-10.2-baseline-20261023` is still the frozen reference.
+> [Status of the 11.0 port](#status-of-the-110-port) has the results.
 
 - **CHERI-RISC-V** is the main target. It is checked instruction by
   instruction with [TestRIG](https://github.com/WyattVO/TestRIG-cheri-qemu/tree/testrig-cheri-qemu-10.2),
@@ -25,8 +25,7 @@ They are verified with the TestRIG gate rather than taken on trust. The 10.2
 port at tag [`cheri-10.2-baseline-20261023`](https://github.com/WyattVO/cheri-qemu-port/tree/cheri-10.2-baseline-20261023)
 passes every stage of the gate and every Morello test, and each CHERI-RISC-V
 bug fix has a regression trace or a bare-metal test that fails without it.
-The 11.0 port is being checked with the same gate. It will get a baseline
-tag once it passes.
+The 11.0 port passes the same gate (2026-10-27).
 
 ## Where this comes from
 
@@ -40,7 +39,7 @@ tag once it passes.
 
 Branches in this fork:
 
-- `cheri-11.0`: this branch, the QEMU 11.0 port (work in progress).
+- `cheri-11.0`: this branch, the QEMU 11.0 port.
 - `cheri-10.2`: the QEMU 10.2 port, which passes the full gate. Its fixes are
   merged into `cheri-11.0` as they land.
 - `main`: the original QEMU 7.1-based CHERI-QEMU, used as the comparison baseline.
@@ -56,14 +55,20 @@ upstream commits and 47 conflicting files.
 | Check | Result on 11.0 |
 |---|---|
 | Builds `riscv64xcheri` and `riscv64cheristd` | yes |
-| Builds `morello` | not tried yet |
-| Gate stage 1, CHERI extension policy | **fails**: 7 extensions that are new in 11.0 have not been reviewed yet (below). Every 10.2 rule still holds. |
-| Gate stage 2, saved regression traces vs Sail | pass |
-| Gate stage 3, bare-metal tests | pass. `pte-cd-update-pmp` is still an expected failure, because its upstream fix (`fa2cf74883`) is in 11.1, not 11.0.0. |
-| Gate stage 4 (random tests and coverage), 4b (three-way vote) | not run yet |
-| Gate stage 5, CheriBSD | not run yet |
-| Gate stage 6, upstream comparison | not run yet. It needs an upstream v11.0.0 reference build. |
-| morello-generated-tests | not run yet |
+| Builds `morello` | yes |
+| Builds `riscv32xcheri` and `riscv32cheristd` | yes, but nothing tests them (as on 10.2) |
+| Gate stage 1, CHERI extension policy | pass: 135 extensions reviewed, 38 refused, including the 7 that are new in 11.0 (below) |
+| Gate stage 2, saved regression traces vs Sail | pass (7 warnings, all CHERI-Alliance QEMU differing, as on 10.2) |
+| Gate stage 3, bare-metal tests | pass. `pte-cd-update-pmp` is still an expected failure, because its upstream fix (`fa2cf74883`) is not in 11.0.0. |
+| Gate stage 4, random tests and coverage | pass: 39 templates, 100 tests each, no difference from Sail |
+| Gate stage 4b, three-way vote | pass: in all 286 disagreements Sail agrees with this port and CHERI-Alliance QEMU differs |
+| Gate stage 5, CheriBSD | pass: `cheribsdtest-purecap` 305 pass / 10 expected failures, `-hybrid` 149 / 52, as on 10.2 |
+| Gate stage 6, upstream comparison | pass, against upstream v11.0.0 |
+| morello-generated-tests | 3393 pass, 2 skipped, as on 10.2 |
+
+These are from the gate run of 2026-10-27 (`full-11.0.conf`, 100 tests per
+template, seed 20261027), which ended with `TESTRIG GATE: PASS (38
+warnings)`.
 
 ### What the merge had to keep
 
@@ -90,16 +95,17 @@ the DDC bounds and permission checks. The port handles them like this:
 | Extension | In this port |
 |---|---|
 | `zalasr` (load-acquire/store-release) | Integer-mode accesses go through DDC like other loads and stores. Reserved in capability mode, because CHERI v9 has no capability form of these instructions. |
-| `zilsd`, `zclsd` (RV32 load/store pair) | Illegal on CHERI CPUs. They are decoded after CHERI v9's RV32 `lc`/`sc`, which use the same encodings. |
-| `xmipslsp` (MIPS vendor load/store pair) | Illegal on CHERI CPUs. |
+| `zilsd`, `zclsd` (RV32 load/store pair) | Refused on CHERI CPUs, and their instructions are illegal. They are decoded after CHERI v9's RV32 `lc`/`sc`, which use the same encodings. |
+| `xmipslsp` (MIPS vendor load/store pair) | Refused on CHERI CPUs, and its instructions are illegal. |
 
-These three, plus `xmipscmov`, `xmipscbop` and `smpmpmt`, are the 7
-extensions that the gate's extension review (stage 1) still has to sign off.
+The other new extensions, `xmipscmov`, `xmipscbop` and `smpmpmt`, don't
+access memory and are allowed. The gate's extension review (stage 1) covers
+all 7.
 
 ## What the 10.2 port does
 
-Everything in this section was measured on `cheri-10.2`. It has not been
-re-measured on 11.0 yet (see the status table above).
+Everything in this section was measured on `cheri-10.2`. The 11.0 port gives
+the same results (see the status table above).
 
 - Builds three CHERI system emulators. Two are CHERI-RISC-V:
   - `qemu-system-riscv64xcheri`: CHERI ISA v9 (Xcheri), which is what CheriBSD,
@@ -317,11 +323,9 @@ CHERIBSD_OUTPUT=~/cheri/output utils/scripts/testrig-gate.sh /path/to/build/qemu
 ```
 
 It must end with `TESTRIG GATE: PASS`. Run it after every change to this
-branch. On 11.0 it currently ends with `FAIL` at stage 1, because of the
-extensions that have not been reviewed yet (see the status above). The
-`testrig-cheri-qemu-10.2` TestRIG branch is written for 10.2. Its stage 6
-compares against upstream v10.2.0, so on 11.0 point `UPSTREAM_BUILD` at an
-upstream v11.0.0 build instead. The fork's `docker/` directory builds a
+branch. On 11.0 use `--config utils/gate-profiles/full-11.0.conf`, which
+compares stage 6 against an upstream v11.0.0 build (`refs/build-refs.sh
+upstream11`) instead of v10.2.0. The fork's `docker/` directory builds a
 container with the 10.2 port and every reference the gate uses. There is no
 11.0 image yet.
 
@@ -350,12 +354,10 @@ a RISC-V fix once broke the Morello build.
   observable and `cbo.zero` aborts QEMU). The default for CHERI, round-robin
   TCG, is safe; use it for `-smp`.
 
-- Finishing the 11.0 port: review the 7 new extensions (gate stage 1), run
-  gate stages 4 to 6, build and test Morello, and tag a baseline once the
-  full gate passes.
+- Tagging an 11.0 baseline.
 - Making Zilsd/Zclsd and the XMIPS load/store pair CHERI-aware (they are
-  illegal on CHERI CPUs for now), and merging QEMU 11.0.x/11.1, which
-  contains the PMP fix `fa2cf74883`.
+  refused on CHERI CPUs for now), and merging the QEMU 11.0.x stable
+  releases or 11.1, which contains the PMP fix `fa2cf74883`.
 - Instruction-level testing of Morello (TestRIG has no Morello model), and
   booting CheriBSD for Morello.
 - Making vector CHERI-aware, which is needed before it can be enabled.
