@@ -1249,6 +1249,14 @@ static const struct {
                      "shadow stack accesses are not checked against DDC"),
     CHERI_UNSAFE_EXT(zicfilp,
                      "capability jumps don't set the expected landing pad state"),
+    /* Their instructions are also illegal on CHERI (trans_zilsd.c.inc). */
+    CHERI_UNSAFE_EXT(zilsd,
+                     "register-pair loads/stores are not checked against DDC"),
+    CHERI_UNSAFE_EXT(zclsd,
+                     "register-pair loads/stores are not checked against DDC"),
+    /* Also illegal on CHERI (trans_xmips.c.inc). */
+    CHERI_UNSAFE_EXT(xmipslsp,
+                     "pair loads/stores have no capability-mode definition"),
 #undef CHERI_UNSAFE_EXT
 };
 
