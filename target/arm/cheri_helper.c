@@ -203,7 +203,7 @@ void helper_store_exclusive_cap_via_cap(CPUArchState *env, uint32_t rs,
          * Get both locks
          * (for the strongest possible operation that might occur)
          */
-        int mmu_indx = cpu_mmu_index(env, false);
+        int mmu_indx = cpu_mmu_index(env_cpu(env), false);
 
         cheri_lock_for_tag_set(env, addr, cb, NULL, _host_return_address,
                                mmu_indx, &low_lock);
@@ -282,7 +282,7 @@ static void swap_cap_via_cap_impl(CPUArchState *env, uint32_t cd, uint32_t cs,
     tag_writer_lock_t lock = NULL;
 
     cheri_lock_for_tag_set(env, addr, cb, NULL, _host_return_address,
-                           cpu_mmu_index(env, false), &lock);
+                           cpu_mmu_index(env_cpu(env), false), &lock);
     cheri_tag_writer_push_free_on_exception(env, lock);
 
     // load (without modifying cs as we will need it for the comparison)

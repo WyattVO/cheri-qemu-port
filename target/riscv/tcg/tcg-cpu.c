@@ -284,11 +284,8 @@ static vaddr riscv_pointer_wrap(CPUState *cs, int mmu_idx,
 #endif
 
 const TCGCPUOps riscv_tcg_ops = {
-#ifdef TARGET_CHERI
-    .mttcg_supported = false,
-#else
+    /* CHERI: capability tags are kept atomic with their data by lock_tag. */
     .mttcg_supported = true,
-#endif
     .guest_default_memory_order = 0,
 
 

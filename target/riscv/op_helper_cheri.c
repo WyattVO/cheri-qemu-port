@@ -39,6 +39,7 @@
 #include "cpu.h"
 #include "qemu/main-loop.h"
 #include "exec/cputlb.h"
+#include "accel/tcg/cpu-mmu-index.h"
 #include "exec/translation-block.h"
 #include "exec/page-protection.h"
 #include "exec/tb-flush.h"
@@ -417,7 +418,7 @@ void HELPER(amoswap_cap)(CPUArchState *env, uint32_t dest_reg,
     tag_writer_lock_t lock = NULL;
 
     cheri_lock_for_tag_set(env, addr, addr_reg, NULL, _host_return_address,
-                           cpu_mmu_index(env, false), &lock);
+                           cpu_mmu_index(env_cpu(env), false), &lock);
     cheri_tag_writer_push_free_on_exception(env, lock);
 
     bool loaded_tag =
@@ -570,7 +571,7 @@ static target_ulong sc_c_impl(CPUArchState *env, uint32_t addr_reg,
 
     tag_writer_lock_t lock = NULL;
     cheri_lock_for_tag_set(env, addr, addr_reg, NULL, _host_return_address,
-                           cpu_mmu_index(env, false), &lock);
+                           cpu_mmu_index(env_cpu(env), false), &lock);
     cheri_tag_writer_push_free_on_exception(env, lock);
 
     load_cap_from_memory_raw_tag(env, &current_pesbt, &current_cursor, addr_reg,
