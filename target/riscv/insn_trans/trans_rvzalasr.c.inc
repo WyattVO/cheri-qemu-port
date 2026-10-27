@@ -35,7 +35,8 @@ static bool gen_load_acquire(DisasContext *ctx, arg_lb_aqrl *a, MemOp memop)
     decode_save_opc(ctx, 0);
 
     TCGv addr = get_address(ctx, a->rs1, 0);
-    TCGv dest = get_gpr(ctx, a->rd, EXT_NONE);
+    /* Not get_gpr: for rd = x0 that is the constant zero (ctx->zero). */
+    TCGv dest = dest_gpr(ctx, a->rd);
     TCGBar bar = (a->rl) ? TCG_BAR_STRL : 0;
 
     /* Check that AQ is set, as this is mandatory */
