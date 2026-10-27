@@ -123,7 +123,7 @@ _Static_assert(CAP_TAG_GET_MANY_SHFT <= 3, "");
 #if (CAP_TAG_GET_MANY_SHFT == 3)
 #define byte_unpack_he byte_unpack_64
 #define byte_pack_he   byte_pack_64
-#ifdef HOST_BIG_ENDIAN
+#if HOST_BIG_ENDIAN /* always defined, as 0 or 1 */
 #define byte_unpack_le byte_unpack_swap_64
 #define byte_pack_le   byte_pack_swap_64
 #else
@@ -134,7 +134,7 @@ _Static_assert(CAP_TAG_GET_MANY_SHFT <= 3, "");
 #elif (CAP_TAG_GET_MANY_SHFT == 2)
 #define byte_unpack_he byte_unpack_32
 #define byte_pack_he   byte_pack_32
-#ifdef HOST_BIG_ENDIAN
+#if HOST_BIG_ENDIAN
 #define byte_unpack_le byte_unpack_swap_32
 #define byte_pack_le   byte_pack_swap_32
 #else
