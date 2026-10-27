@@ -585,8 +585,10 @@ static void arm_cpu_reset_hold(Object *obj, ResetType type)
              * it got copied into memory. In the latter case, rom_ptr
              * will return a NULL pointer and we should use ldl_phys instead.
              */
-            initial_msp = ldl_phys(cs->as, vecbase);
-            initial_pc = ldl_phys(cs->as, vecbase + 4);
+            initial_msp = address_space_ldl_le(cs->as, vecbase,
+                                               MEMTXATTRS_UNSPECIFIED, NULL);
+            initial_pc = address_space_ldl_le(cs->as, vecbase + 4,
+                                              MEMTXATTRS_UNSPECIFIED, NULL);
         }
 
         qemu_log_mask(CPU_LOG_INT,

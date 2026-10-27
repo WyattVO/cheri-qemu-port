@@ -1133,5 +1133,6 @@ DEF_HELPER_FLAGS_4(arm_log_instr, TCG_CALL_NO_WG, void, env, i64, i32, i32)
 #endif
 
 #ifdef TARGET_CHERI
+#include "cheri-helper-common.h"
 #include "helper-cheri.h"
 #endif

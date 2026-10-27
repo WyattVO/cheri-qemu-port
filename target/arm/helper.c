@@ -36,6 +36,9 @@
 #include "cpregs.h"
 #include "target/arm/gtimer.h"
 #include "qemu/plugin.h"
+#ifdef CONFIG_TCG_LOG_INSTR
+#include "helper.h"
+#endif
 
 static void switch_mode(CPUARMState *env, int mode);
 
