@@ -47,6 +47,14 @@
 void cheri_tag_phys_invalidate_external(RAMBlock *ram,
                                ram_addr_t ram_offset, ram_addr_t len);
 /*
+ * Write-lock the capability-sized word at @ram_offset for a read-modify-write
+ * of guest RAM that QEMU does itself (e.g. the page-table walker setting A/D
+ * bits). Returns NULL when no lock is needed (no MTTCG, untagged RAM) or when
+ * @cpu already holds it. Release with cheri_tag_writer_release().
+ */
+void *cheri_tag_phys_writer_lock(CPUState *cpu, RAMBlock *ram,
+                                 ram_addr_t ram_offset);
+/*
  * TODO: We might want to think about the performance correctness trade-off
  * here. On multicore, we always want to use locking.
  * For singlecore, it would be more performant to have no locks. Not only could

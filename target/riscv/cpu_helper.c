@@ -42,6 +42,7 @@
 #include "helper_utils.h"
 #ifdef TARGET_CHERI
 #include "cheri-helper-utils.h"
+#include "cheri_tagmem.h"
 #endif
 
 #ifdef TARGET_CHERI
@@ -1833,6 +1834,15 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
         if (memory_region_is_ram(mr)) {
             target_ulong *pte_pa = qemu_map_ram_ptr(mr->ram_block, addr1);
             target_ulong old_pte;
+#ifdef TARGET_CHERI
+            /*
+             * Under MTTCG a guest AMO on this PTE (e.g. the kernel clearing
+             * CD) is a load and a store under the tag lock, so take that
+             * lock too, or the AMO can undo this A/D/CD update.
+             */
+            void *pte_lock = cheri_tag_phys_writer_lock(cs, mr->ram_block,
+                                                        addr1);
+#endif
             if (riscv_cpu_sxl(env) == MXL_RV32) {
                 old_pte = qatomic_cmpxchg((uint32_t *)pte_pa, cpu_to_le32(pte), cpu_to_le32(updated_pte));
                 old_pte = le32_to_cpu(old_pte);
@@ -1840,6 +1850,9 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
                 old_pte = qatomic_cmpxchg(pte_pa, cpu_to_le64(pte), cpu_to_le64(updated_pte));
                 old_pte = le64_to_cpu(old_pte);
             }
+#ifdef TARGET_CHERI
+            cheri_tag_writer_release(pte_lock);
+#endif
             if (old_pte != pte) {
                 goto restart;
             }
