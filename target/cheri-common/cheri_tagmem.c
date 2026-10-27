@@ -35,6 +35,7 @@
 #include "cheri_tagmem.h"
 #include "cpu.h"
 #include "exec/cputlb.h"
+#include "exec/tlb-flags.h"
 #include "exec/translation-block.h"
 #include "exec/page-protection.h"
 #include "exec/tb-flush.h"
@@ -477,13 +478,14 @@ void cheri_tag_init(MemoryRegion *mr, uint64_t memory_size)
            "Incorrect tag mem size passed?");
     assert(mr->ram_block->cheri_tags == NULL && "Already initialized?");
 
+    /* qemu_tcg_mttcg_enabled() asserts that the accelerator is TCG. */
+    bool concurrent = tcg_enabled() && qemu_tcg_mttcg_enabled() &&
+                      current_machine->smp.max_cpus > 1;
     if (!_need_concurrent_tags_initialized) {
-        _need_concurrent_tags =
-            qemu_tcg_mttcg_enabled() && current_machine->smp.max_cpus > 1;
+        _need_concurrent_tags = concurrent;
         _need_concurrent_tags_initialized = true;
     } else {
-        assert(_need_concurrent_tags ==
-               (qemu_tcg_mttcg_enabled() && current_machine->smp.max_cpus > 1));
+        assert(_need_concurrent_tags == concurrent);
     }
     size_t cheri_ntagblks = num_tagblocks(mr->ram_block);
     mr->ram_block->cheri_tags =
@@ -674,7 +676,8 @@ static void invalidate_from_locktag(lock_tag *lock, CPUArchState *env,
             error_report("%s", buffer);
             void *host_addr = NULL;
             int access_flags = probe_access_flags(
-                env, vaddr, MMU_DATA_STORE, mmu_idx, true, &host_addr, pc);
+                env, vaddr, CHERI_CAP_SIZE, MMU_DATA_STORE, mmu_idx, true,
+                &host_addr, pc);
             error_report(
                 "Probe access returns access_flags = 0x%x and host_addr %p",
                 access_flags, host_addr);
