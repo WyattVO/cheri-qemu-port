@@ -873,6 +873,39 @@ void cheri_tag_phys_invalidate_external(RAMBlock *ram,
 }
 
 
+/*
+ * Under MTTCG a guest atomic (AMO, LR/SC, CAS) is a load and a store under
+ * this word's tag lock (ALL_WRITES_ATOMIC), not a host atomic. QEMU's own
+ * updates of guest RAM must take the same lock, or a guest AMO running on
+ * another vCPU can overwrite them with the value it loaded earlier.
+ */
+void *cheri_tag_phys_writer_lock(CPUState *cpu, RAMBlock *ram,
+                                 ram_addr_t ram_offset)
+{
+    if (!need_concurrent_tags() || !ram->cheri_tags) {
+        return NULL;
+    }
+    uint64_t tag = ram_offset / CHERI_CAP_SIZE;
+    CheriTagBlock *tagblk = cheri_tag_block(tag, ram);
+    if (!tagblk) {
+        /*
+         * No vCPU has the page mapped (a TLB fill allocates the block under
+         * MTTCG), so no TLB flush is needed for the new block.
+         */
+        tagblk = cheri_tag_new_tagblk(ram, tag);
+    }
+    lock_tag *lock = &tagblk->locked_tags[CAP_TAGBLK_IDX(tag)];
+
+    /* An instruction holding this lock can walk the page table itself. */
+    for (size_t i = 0; i != MAX_CHERI_EXCEPTION_LOCKS; i++) {
+        if (cpu && cpu->cheri_exception_locks.locks[i] == lock) {
+            return NULL;
+        }
+    }
+    lock_tag_write_acquire_lock(lock);
+    return lock;
+}
+
 void cheri_tag_phys_invalidate(CPUArchState *env, RAMBlock *ram,
                                ram_addr_t ram_offset, ram_addr_t len,
                                const target_ulong *vaddr)
