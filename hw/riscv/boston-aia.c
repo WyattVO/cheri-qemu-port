@@ -302,7 +302,7 @@ xilinx_pcie_init(MemoryRegion *sys_mem, uint32_t bus_nr,
                  qemu_irq irq)
 {
     DeviceState *dev;
-    MemoryRegion *cfg, *mmio;
+    MemoryRegion *cfg;
 
     dev = qdev_new(TYPE_XILINX_PCIE_HOST);
 
@@ -317,8 +317,11 @@ xilinx_pcie_init(MemoryRegion *sys_mem, uint32_t bus_nr,
     cfg = sysbus_mmio_get_region(SYS_BUS_DEVICE(dev), 0);
     memory_region_add_subregion_overlap(sys_mem, cfg_base, cfg, 0);
 
-    mmio = sysbus_mmio_get_region(SYS_BUS_DEVICE(dev), 1);
-    memory_region_add_subregion_overlap(sys_mem, 0, mmio, 0);
+    /*
+     * This tree has the hobgoblin version of the Xilinx PCIe host: its MMIO
+     * region is already in the host's bus address space, and the host maps
+     * the mmio_base window into system memory itself (as on hobgoblin).
+     */
 
     qdev_connect_gpio_out_named(dev, "interrupt_out", 0, irq);
 
