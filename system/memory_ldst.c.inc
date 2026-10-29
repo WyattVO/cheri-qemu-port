@@ -85,7 +85,9 @@ void glue(address_space_stm_internal, SUFFIX)(ARG1_DECL, MemOp mop,
         r = memory_region_dispatch_write(mr, addr1, val, mop, attrs);
     } else {
         /* RAM case */
+        CheriDMALocks cl = cheri_dma_lock(mr, addr1, size);
         stm_p(qemu_map_ram_ptr(mr->ram_block, addr1), mop, val);
+        cheri_dma_unlock(cl);
         invalidate_and_set_dirty(mr, addr1, size);
         r = MEMTX_OK;
     }

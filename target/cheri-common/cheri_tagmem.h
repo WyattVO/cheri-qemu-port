@@ -55,6 +55,11 @@ void cheri_tag_phys_invalidate_external(RAMBlock *ram,
 void *cheri_tag_phys_writer_lock(CPUState *cpu, RAMBlock *ram,
                                  ram_addr_t ram_offset);
 /*
+ * Clear the tag of a word locked by cheri_tag_phys_writer_lock() and release
+ * the lock, after QEMU overwrote the word's data (e.g. for a device).
+ */
+void cheri_tag_phys_writer_clear_release(void *lock);
+/*
  * TODO: We might want to think about the performance correctness trade-off
  * here. On multicore, we always want to use locking.
  * For singlecore, it would be more performant to have no locks. Not only could
