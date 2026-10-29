@@ -240,7 +240,12 @@ static void cortex_m55_initfn(Object *obj)
 static const TCGCPUOps arm_v7m_tcg_ops = {
     /* ARM processors have a weak memory model */
     .guest_default_memory_order = 0,
+#ifdef TARGET_CHERI
+    /* As arm_tcg_ops: no lock_tag on CHERI-ARM. */
+    .mttcg_supported = false,
+#else
     .mttcg_supported = true,
+#endif
 
     .initialize = arm_translate_init,
     .translate_code = arm_translate_code,
