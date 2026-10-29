@@ -2472,7 +2472,12 @@ static vaddr aprofile_pointer_wrap(CPUState *cs, int mmu_idx,
 #endif /* !CONFIG_USER_ONLY */
 
 static const TCGCPUOps arm_tcg_ops = {
+#ifdef TARGET_CHERI
+    /* Morello: lock_tag is only enabled and tested on CHERI-RISC-V. */
+    .mttcg_supported = false,
+#else
     .mttcg_supported = true,
+#endif
     /* ARM processors have a weak memory model */
     .guest_default_memory_order = 0,
 

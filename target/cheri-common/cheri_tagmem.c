@@ -47,6 +47,8 @@
 #include "exec/target_page.h"
 #include "system/tcg.h"
 #include "hw/boards.h"
+#include "qemu/target-info.h"
+#include "accel/tcg/cpu-ops.h"
 #include "cheri_tagmem_locktag.h"
 
 #include "cheri_defs.h"
@@ -481,6 +483,19 @@ void cheri_tag_init(MemoryRegion *mr, uint64_t memory_size)
     /* qemu_tcg_mttcg_enabled() asserts that the accelerator is TCG. */
     bool concurrent = tcg_enabled() && qemu_tcg_mttcg_enabled() &&
                       current_machine->smp.max_cpus > 1;
+    if (concurrent) {
+        /*
+         * -accel tcg,thread=multi forces MTTCG on a target without lock_tag,
+         * whose tag updates race with other harts' stores: refuse to run.
+         */
+        CPUClass *cc = CPU_CLASS(object_class_by_name(target_cpu_type()));
+        if (!cc->tcg_ops->mttcg_supported) {
+            error_report("CHERI capability tags are not thread-safe on this "
+                         "target, so MTTCG could forge capabilities; "
+                         "run with -accel tcg,thread=single");
+            exit(1);
+        }
+    }
     if (!_need_concurrent_tags_initialized) {
         _need_concurrent_tags = concurrent;
         _need_concurrent_tags_initialized = true;
