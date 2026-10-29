@@ -921,6 +921,11 @@ void *cheri_tag_phys_writer_lock(CPUState *cpu, RAMBlock *ram,
     return lock;
 }
 
+void cheri_tag_phys_writer_clear_release(void *lock)
+{
+    lock_tag_write_tag_and_release(lock, false);
+}
+
 void cheri_tag_phys_invalidate(CPUArchState *env, RAMBlock *ram,
                                ram_addr_t ram_offset, ram_addr_t len,
                                const target_ulong *vaddr)

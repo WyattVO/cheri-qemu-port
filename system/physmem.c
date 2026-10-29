@@ -3177,6 +3177,78 @@ static void invalidate_and_set_dirty(MemoryRegion *mr, hwaddr addr,
 #endif
 }
 
+#if defined(TARGET_CHERI)
+/*
+ * Under MTTCG, a device's write to tagged RAM must be atomic with clearing
+ * the tags it overwrites: a capability load on another hart in between would
+ * get the old tag on the device's bytes, i.e. a forged capability. So each
+ * capability word is written holding its tag write lock, which capability
+ * loads and stores also take, and its tag is cleared as the lock is
+ * released. (invalidate_and_set_dirty() still clears the tags afterwards.)
+ */
+static bool cheri_dma_needs_locks(MemoryRegion *mr)
+{
+    return need_concurrent_tags() && mr->ram_block && mr->ram_block->cheri_tags;
+}
+
+typedef struct {
+    void *lo, *hi;
+} CheriDMALocks;
+
+/* Lock the capability words of a write of @len <= CHERI_CAP_SIZE bytes. */
+static CheriDMALocks cheri_dma_lock(MemoryRegion *mr, ram_addr_t addr,
+                                    hwaddr len)
+{
+    CheriDMALocks l = { NULL, NULL };
+
+    if (cheri_dma_needs_locks(mr)) {
+        l.lo = cheri_tag_phys_writer_lock(current_cpu, mr->ram_block, addr);
+        if ((addr + len - 1) / CHERI_CAP_SIZE != addr / CHERI_CAP_SIZE) {
+            l.hi = cheri_tag_phys_writer_lock(current_cpu, mr->ram_block,
+                                              addr + len - 1);
+        }
+    }
+    return l;
+}
+
+static void cheri_dma_unlock(CheriDMALocks l)
+{
+    if (l.hi) {
+        cheri_tag_phys_writer_clear_release(l.hi);
+    }
+    if (l.lo) {
+        cheri_tag_phys_writer_clear_release(l.lo);
+    }
+}
+
+/* memmove() into RAM at @addr of @mr for a device, a locked word at a time. */
+static void cheri_dma_write(MemoryRegion *mr, ram_addr_t addr, uint8_t *ptr,
+                            const uint8_t *buf, hwaddr len)
+{
+    if (!cheri_dma_needs_locks(mr)) {
+        memmove(ptr, buf, len);
+        return;
+    }
+    while (len) {
+        hwaddr n = MIN(len, CHERI_CAP_SIZE - addr % CHERI_CAP_SIZE);
+        CheriDMALocks l = cheri_dma_lock(mr, addr, n);
+
+        memmove(ptr, buf, n);
+        cheri_dma_unlock(l);
+        addr += n;
+        ptr += n;
+        buf += n;
+        len -= n;
+    }
+}
+#else
+typedef int CheriDMALocks;
+#define cheri_dma_needs_locks(mr) false
+#define cheri_dma_lock(mr, addr, len) 0
+#define cheri_dma_unlock(l) ((void)(l))
+#define cheri_dma_write(mr, addr, ptr, buf, len) memmove(ptr, buf, len)
+#endif
+
 void memory_region_flush_rom_device(MemoryRegion *mr, hwaddr addr, hwaddr size)
 {
     /*
@@ -3302,7 +3374,7 @@ static MemTxResult flatview_write_continue_step(MemTxAttrs attrs,
         uint8_t *ram_ptr = qemu_ram_ptr_length(mr->ram_block, mr_addr, l,
                                                false, true);
 
-        memmove(ram_ptr, buf, *l);
+        cheri_dma_write(mr, mr_addr, ram_ptr, buf, *l);
         invalidate_and_set_dirty(mr, mr_addr, *l);
 
         return MEMTX_OK;
@@ -3669,6 +3741,7 @@ typedef struct {
     MemoryRegion *mr;
     hwaddr addr;
     size_t len;
+    bool counted;   /* in bounce_buffer_size (not a CHERI bounce) */
     uint8_t buffer[];
 } BounceBuffer;
 
@@ -3838,7 +3911,18 @@ void *address_space_map(AddressSpace *as,
     fv = address_space_to_flatview(as);
     mr = flatview_translate(fv, addr, &xlat, &l, is_write, attrs);
 
-    if (!memory_access_is_direct(mr, is_write, attrs)) {
+    /*
+     * CHERI under MTTCG: a device writing through a mapping would write
+     * tagged RAM without the tag locks for as long as the mapping lives (an
+     * I/O request). Give it a bounce buffer instead, unlimited in size, so
+     * address_space_unmap() writes the data with the locks held.
+     */
+    bool cheri_bounce = is_write && memory_access_is_direct(mr, is_write, attrs)
+                        && cheri_dma_needs_locks(mr);
+
+    if (cheri_bounce) {
+        /* l: up to the end of this RAM section */
+    } else if (!memory_access_is_direct(mr, is_write, attrs)) {
         size_t used = qatomic_read(&as->bounce_buffer_size);
         for (;;) {
             hwaddr alloc = MIN(as->max_bounce_buffer_size - used, l);
@@ -3856,13 +3940,16 @@ void *address_space_map(AddressSpace *as,
             *plen = 0;
             return NULL;
         }
+    }
 
+    if (cheri_bounce || !memory_access_is_direct(mr, is_write, attrs)) {
         BounceBuffer *bounce = g_malloc0(l + sizeof(BounceBuffer));
         bounce->magic = BOUNCE_BUFFER_MAGIC;
         memory_region_ref(mr);
         bounce->mr = mr;
         bounce->addr = addr;
         bounce->len = l;
+        bounce->counted = !cheri_bounce;
 
         if (!is_write) {
             flatview_read(fv, addr, attrs,
@@ -3911,7 +3998,9 @@ void address_space_unmap(AddressSpace *as, void *buffer, hwaddr len,
                             bounce->buffer, access_len);
     }
 
-    qatomic_sub(&as->bounce_buffer_size, bounce->len);
+    if (bounce->counted) {
+        qatomic_sub(&as->bounce_buffer_size, bounce->len);
+    }
     bounce->magic = ~BOUNCE_BUFFER_MAGIC;
     memory_region_unref(bounce->mr);
     g_free(bounce);
@@ -3971,7 +4060,9 @@ int64_t address_space_cache_init(MemoryRegionCache *cache,
 
     mr = cache->mrs.mr;
     memory_region_ref(mr);
-    if (memory_access_is_direct(mr, is_write, MEMTXATTRS_UNSPECIFIED)) {
+    /* CHERI under MTTCG: writes take the slow path, which locks tags. */
+    if (memory_access_is_direct(mr, is_write, MEMTXATTRS_UNSPECIFIED) &&
+        !(is_write && cheri_dma_needs_locks(mr))) {
         /* We don't care about the memory attributes here as we're only
          * doing this if we found actual RAM, which behaves the same
          * regardless of attributes; so UNSPECIFIED is fine.
