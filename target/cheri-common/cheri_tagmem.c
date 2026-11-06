@@ -46,7 +46,7 @@
 #include "accel/tcg/cpu-ldst.h"
 #include "exec/target_page.h"
 #include "system/tcg.h"
-#include "hw/boards.h"
+#include "hw/core/boards.h"
 #include "qemu/target-info.h"
 #include "accel/tcg/cpu-ops.h"
 #include "cheri_tagmem_locktag.h"
