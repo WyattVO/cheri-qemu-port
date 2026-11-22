@@ -30,6 +30,16 @@ struct TCGCPUOps {
     bool mttcg_supported;
 
     /**
+     * mttcg_opt_in: multi-threaded TCG is supported, but is not the default
+     *
+     * For a target where MTTCG is correct but is not the mode the target's
+     * users should get without asking: "-accel tcg,thread=auto" resolves to
+     * single-threaded, and MTTCG has to be requested with
+     * "-accel tcg,thread=multi". Ignored unless @mttcg_supported is true.
+     */
+    bool mttcg_opt_in;
+
+    /**
      * @precise_smc: Stores which modify code within the current TB force
      *               the TB to exit; the next executed instruction will see
      *               the result of the store.
