@@ -90,6 +90,11 @@ Svpbmt/Svnapot, whose PTE bits are CHERI bits.
 
 Every CHERI-RISC-V fix below has a TestRIG regression trace or a bare-metal
 test in the TestRIG fork (`regressions/`), so it can't come back unnoticed.
+
+This branch carries the `lock_tag` series, which makes CHERI capability tags
+safe under multi-threaded TCG; see [MTTCG](#mttcg) for how to turn it on. It
+is off by default, so the results below describe round-robin TCG, and the
+device-write (DMA) tag fix in that series applies under MTTCG only.
 The upstream qtests in the gate's stage 6 cover the other RISC-V fixes, and
 the morello-generated-tests cover the Morello fixes.
 
@@ -274,12 +279,40 @@ Expect `3393 passed, 2 skipped`. Run it after changes to shared code
 (`accel/tcg`, `target/cheri-common`, `include/`) as well as `target/arm`:
 a RISC-V fix once broke the Morello build.
 
-## Not done yet
+### MTTCG
 
-- SMP with MTTCG: CHERI tags are not thread-safe across host threads (QEMU
-  warns when `-accel tcg,thread=multi` is given; a forged capability is
-  observable and `cbo.zero` aborts QEMU). The default for CHERI, round-robin
-  TCG, is safe; use it for `-smp`.
+CHERI-RISC-V runs under multi-threaded TCG, but not by default: ask for it
+with `-accel tcg,thread=multi`. Without that flag every hart runs round-robin
+on one host thread, however many `-smp` you give, which is the mode this
+branch's recorded gate results describe.
+
+```sh
+qemu-system-riscv64xcheri -M virt -smp 4 -accel tcg,thread=multi ...
+```
+
+With MTTCG on, capability tags are kept in a byte each with a reader-writer
+lock packed into it (`lock_tag`) instead of a bitmap, generated code takes
+that lock around every store that may meet a capability, and device writes
+take it too, so a DMA write can never leave a tag on the bytes it wrote. The
+mode only engages when more than one hart is possible (`-smp N` or
+`maxcpus=N`, N > 1); at one hart the bitmap is used whatever the accelerator
+is doing.
+
+Round-robin mode keeps the known device-vs-vCPU tag race that
+`target/cheri-common/cheri_tagmem.h` documents and `UNSAFE_SINGLE_CORE`
+accepts: the DMA tag locking is conditional on MTTCG being on, so the
+device-write fix applies under MTTCG only.
+
+Morello has no `lock_tag` support and is not tested under MTTCG, so it
+reports no MTTCG support and refuses to start a multi-CPU machine under
+`-accel tcg,thread=multi` rather than running unsafely.
+
+To see which mode a running QEMU chose, start it with
+`-name debug-threads=on`: under MTTCG its vCPU threads are named
+`CPU <n>/TCG`, one per hart, and under round-robin there is a single
+`ALL CPUs/TCG`.
+
+## Not done yet
 
 - Rebasing onto QEMU 11.
 - Instruction-level testing of Morello (TestRIG has no Morello model), and
