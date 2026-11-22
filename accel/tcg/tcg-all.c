@@ -124,7 +124,8 @@ static int tcg_init_machine(AccelState *as, MachineState *ms)
          * there is one remaining limitation to check:
          *   - The guest can't be oversized (e.g. 64 bit guest on 32 bit host)
          */
-        if (mttcg_supported && !icount_enabled()) {
+        if (mttcg_supported && !cc->tcg_ops->mttcg_opt_in &&
+            !icount_enabled()) {
             s->mttcg_enabled = ON_OFF_AUTO_ON;
             max_threads = ms->smp.max_cpus;
         } else {

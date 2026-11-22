@@ -286,6 +286,15 @@ static vaddr riscv_pointer_wrap(CPUState *cs, int mmu_idx,
 const TCGCPUOps riscv_tcg_ops = {
     /* CHERI: capability tags are kept atomic with their data by lock_tag. */
     .mttcg_supported = true,
+#ifdef TARGET_CHERI
+    /*
+     * lock_tag makes MTTCG correct here, but round-robin TCG is the mode this
+     * port's recorded results describe, and the only one whose device-write
+     * tag locking is not exercised, so ask for MTTCG explicitly with
+     * "-accel tcg,thread=multi" rather than defaulting to it.
+     */
+    .mttcg_opt_in = true,
+#endif
     .guest_default_memory_order = 0,
 
 
