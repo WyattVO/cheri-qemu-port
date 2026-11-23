@@ -249,17 +249,44 @@ to `tools/build/mk/Makefile.boot` in the CheriBSD source.
 
 The TestRIG fork runs everything with one command: the CHERI extension policy
 checks, the saved regression traces, the bare-metal tests, every random
-template and, optionally, CheriBSD. See
+template, a three-way vote against CHERI-Alliance QEMU, CheriBSD, and upstream
+QEMU's own tests. See
 [WyattVO/TestRIG-cheri-qemu](https://github.com/WyattVO/TestRIG-cheri-qemu/tree/testrig-cheri-qemu-10.2)
-for setup, then:
+for setup, then pick how much of it to run:
 
 ```sh
-CHERIBSD_OUTPUT=~/cheri/output utils/scripts/testrig-gate.sh /path/to/build/qemu-system-riscv64xcheri 100
+cd /path/to/TestRIG-cheri-qemu
+G=utils/scripts/testrig-gate.sh
+QEMU=/path/to/cheri-qemu-port/build/qemu-system-riscv64xcheri
+
+$G --config utils/gate-profiles/quick-mttcg.conf $QEMU       # every edit, ~2 min
+$G --config utils/gate-profiles/pre-commit.conf  $QEMU       # before a commit, ~10 min
+$G --config utils/gate-profiles/pre-push.conf    $QEMU 100   # before a push, ~1 h
+$G --config utils/gate-profiles/full.conf        $QEMU 100   # the recorded run, ~1 h
+$G --config utils/gate-profiles/full-mttcg.conf  $QEMU 100   # the same under MTTCG, ~40 min
 ```
 
-It must end with `TESTRIG GATE: PASS`. Run it after every change to this
-branch. The fork's `docker/` directory builds a container with this branch
-and every reference the gate uses.
+Every one of them must end with `TESTRIG GATE: PASS`. What to run when:
+
+- **`quick-mttcg` after every edit.** Two minutes, and it covers both thread
+  modes, so it catches a broken tag path straight away rather than an hour
+  into a long run.
+- **`pre-commit` before committing.** No reference QEMU and no CheriBSD boot,
+  so it needs nothing but a cross compiler and the Sail model.
+- **`pre-push` before pushing.** Every stage, both thread modes, with the vote
+  sampled at 20 tests per template instead of 100.
+- **`full.conf` and `full-mttcg.conf` are what the recorded results mean.**
+  Both are quoted in this README and kept in `reports/gate-runs`.
+
+The profiles expect the reference QEMUs in `~/Projects/CAPSTONE`; override the
+paths on the command line (`--cheribsd`, `--alliance`, `--upstream-build`) if
+yours are elsewhere. The fork's `docker/` directory builds a container with
+this branch and every reference the gate uses.
+
+Where the time goes, if you need to cut a run short: the three-way vote is
+about 40 minutes of a `full.conf` run and the 4-hart CheriBSD boot about 22,
+while every other stage together is under 20. `--skip vote` and
+`--skip cheribsd` are the two big levers.
 
 ### Test Morello
 
@@ -283,8 +310,10 @@ a RISC-V fix once broke the Morello build.
 
 CHERI-RISC-V runs under multi-threaded TCG, but not by default: ask for it
 with `-accel tcg,thread=multi`. Without that flag every hart runs round-robin
-on one host thread, however many `-smp` you give, which is the mode this
-branch's recorded gate results describe.
+on one host thread, however many `-smp` you give. Both modes are tested and
+recorded: round-robin by `full.conf` and MTTCG by `full-mttcg.conf`, or both
+in one run with the gate's `--mttcg both`, which repeats only the two stages
+the thread mode changes (the bare-metal bench and the CheriBSD boot).
 
 ```sh
 qemu-system-riscv64xcheri -M virt -smp 4 -accel tcg,thread=multi ...
