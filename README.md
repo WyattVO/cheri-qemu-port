@@ -329,28 +329,26 @@ cd /path/to/TestRIG-cheri-qemu
 G=utils/scripts/testrig-gate.sh
 QEMU=/path/to/cheri-qemu-port/build/qemu-system-riscv64xcheri
 
-$G --config utils/gate-profiles/quick-mttcg.conf  $QEMU       # every edit, ~2 min
-$G --config utils/gate-profiles/pre-commit.conf   $QEMU       # before a commit, ~10 min
-$G --config utils/gate-profiles/pre-push.conf     $QEMU 100   # before a push, ~1 h
-$G --config utils/gate-profiles/full-11.0.conf    $QEMU 100   # the recorded run, ~1 h
-$G --config utils/gate-profiles/full-11.0-mttcg.conf $QEMU 100 # the same under MTTCG, ~40 min
+$G --config utils/gate-profiles/quick-mttcg.conf      $QEMU      # every edit, ~2 min
+$G --config utils/gate-profiles/pre-commit-11.0.conf  $QEMU      # before a commit, ~10 min
+$G --config utils/gate-profiles/pre-push-11.0.conf    $QEMU 100  # before a push, ~1 h
+$G --config utils/gate-profiles/full-11.0.conf        $QEMU 100  # the recorded run, ~1 h
+$G --config utils/gate-profiles/full-11.0-mttcg.conf  $QEMU 100  # the same under MTTCG, ~40 min
 ```
 
-Every one of them must end with `TESTRIG GATE: PASS`. **On 11.0 the stage 6
-reference must be upstream v11.0.0**, which is what the `full-11.0*` profiles
-change (`refs/build-refs.sh upstream11` builds it). `pre-commit.conf` and
-`pre-push.conf` inherit `full.conf`'s v10.2.0 path, so on 11.0 give them
-`--upstream-build /path/to/upstream-qemu-11.0/build`, or `--skip upstream` to
-leave that stage out. `quick-mttcg.conf` runs no stage that needs a reference,
-so it needs neither.
+Every one of them must end with `TESTRIG GATE: PASS`. Use the `-11.0`
+profiles on this branch: they are their 10.2 namesakes with upstream QEMU
+v11.0.0 as the stage 6 reference (`refs/build-refs.sh upstream11` builds it),
+so that the port is compared against the release it is actually based on.
+`quick-mttcg.conf` has no `-11.0` variant because it runs no stage that needs
+a reference.
 
 What to run when:
 
-- **`quick-mttcg` after every edit.** Two minutes, both thread modes, and it
-  runs no reference-dependent stage at all, so the v10.2.0/v11.0.0 question
-  does not arise.
-- **`pre-commit` before committing.** Add the v11.0.0 `--upstream-build`.
-- **`pre-push` before pushing.** Every stage, both thread modes, the vote
+- **`quick-mttcg` after every edit.** Two minutes, both thread modes.
+- **`pre-commit-11.0` before committing.** No reference QEMU beyond upstream
+  and no CheriBSD boot.
+- **`pre-push-11.0` before pushing.** Every stage, both thread modes, the vote
   sampled at 20 tests per template.
 - **`full-11.0.conf` and `full-11.0-mttcg.conf` are what the recorded results
   mean.** Both are quoted in this README and kept in `reports/gate-runs`.
