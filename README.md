@@ -319,20 +319,49 @@ to `tools/build/mk/Makefile.boot` in the CheriBSD source.
 
 The TestRIG fork runs everything with one command: the CHERI extension policy
 checks, the saved regression traces, the bare-metal tests, every random
-template and, optionally, CheriBSD. See
+template, a three-way vote against CHERI-Alliance QEMU, CheriBSD, and upstream
+QEMU's own tests. See
 [WyattVO/TestRIG-cheri-qemu](https://github.com/WyattVO/TestRIG-cheri-qemu/tree/testrig-cheri-qemu-10.2)
-for setup, then:
+for setup, then pick how much of it to run:
 
 ```sh
-CHERIBSD_OUTPUT=~/cheri/output utils/scripts/testrig-gate.sh /path/to/build/qemu-system-riscv64xcheri 100
+cd /path/to/TestRIG-cheri-qemu
+G=utils/scripts/testrig-gate.sh
+QEMU=/path/to/cheri-qemu-port/build/qemu-system-riscv64xcheri
+
+$G --config utils/gate-profiles/quick-mttcg.conf  $QEMU       # every edit, ~2 min
+$G --config utils/gate-profiles/pre-commit.conf   $QEMU       # before a commit, ~10 min
+$G --config utils/gate-profiles/pre-push.conf     $QEMU 100   # before a push, ~1 h
+$G --config utils/gate-profiles/full-11.0.conf    $QEMU 100   # the recorded run, ~1 h
+$G --config utils/gate-profiles/full-11.0-mttcg.conf $QEMU 100 # the same under MTTCG, ~40 min
 ```
 
-It must end with `TESTRIG GATE: PASS`. Run it after every change to this
-branch. On 11.0 use `--config utils/gate-profiles/full-11.0.conf`, which
-compares stage 6 against an upstream v11.0.0 build (`refs/build-refs.sh
-upstream11`) instead of v10.2.0. The fork's `docker/` directory builds a
-container with the 10.2 port and every reference the gate uses. There is no
-11.0 image yet.
+Every one of them must end with `TESTRIG GATE: PASS`. **On 11.0 the stage 6
+reference must be upstream v11.0.0**, which is what the `full-11.0*` profiles
+change (`refs/build-refs.sh upstream11` builds it). `pre-commit.conf` and
+`pre-push.conf` inherit `full.conf`'s v10.2.0 path, so on 11.0 give them
+`--upstream-build /path/to/upstream-qemu-11.0/build`, or `--skip upstream` to
+leave that stage out. `quick-mttcg.conf` runs no stage that needs a reference,
+so it needs neither.
+
+What to run when:
+
+- **`quick-mttcg` after every edit.** Two minutes, both thread modes, and it
+  runs no reference-dependent stage at all, so the v10.2.0/v11.0.0 question
+  does not arise.
+- **`pre-commit` before committing.** Add the v11.0.0 `--upstream-build`.
+- **`pre-push` before pushing.** Every stage, both thread modes, the vote
+  sampled at 20 tests per template.
+- **`full-11.0.conf` and `full-11.0-mttcg.conf` are what the recorded results
+  mean.** Both are quoted in this README and kept in `reports/gate-runs`.
+
+Where the time goes, if you need to cut a run short: the three-way vote is
+about 40 minutes of a full run and the 4-hart CheriBSD boot about 22, while
+every other stage together is under 20. `--skip vote` and `--skip cheribsd`
+are the two big levers.
+
+The fork's `docker/` directory builds a container with the 10.2 port and every
+reference the gate uses. There is no 11.0 image yet.
 
 ### Test Morello
 
@@ -356,8 +385,11 @@ a RISC-V fix once broke the Morello build.
 
 CHERI-RISC-V runs under multi-threaded TCG, but not by default: ask for it
 with `-accel tcg,thread=multi`. Without that flag every hart runs round-robin
-on one host thread, however many `-smp` you give, which is the mode this
-branch's recorded gate results describe.
+on one host thread, however many `-smp` you give. Both modes are tested and
+recorded: round-robin by `full-11.0.conf` and MTTCG by
+`full-11.0-mttcg.conf`, or both in one run with the gate's `--mttcg both`,
+which repeats only the two stages the thread mode changes (the bare-metal
+bench and the CheriBSD boot).
 
 ```sh
 qemu-system-riscv64xcheri -M virt -smp 4 -accel tcg,thread=multi ...
